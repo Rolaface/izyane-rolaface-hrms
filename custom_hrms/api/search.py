@@ -139,6 +139,60 @@ def get_designations():
     except Exception as e:
         frappe.log_error(frappe.get_traceback(), "Get Designations API Error")
         return send_response("fail", str(e), None, 500, 500)
+
+@frappe.whitelist(allow_guest=False, methods=["GET"])
+def get_salary_structures():
+    try:
+        data = _fetch_paginated_autosuggest(
+            doctype="Salary Structure",
+            filters=frappe._dict({}),
+            search_fields=["name", "salary_structure_name"],
+            field_map={
+                "value": "name",
+                "label": "salary_structure_name",
+                "description": "name",
+            },
+        )
+        return send_response_list("success", "Salary Structures fetched successfully.", data)
+    except Exception as e:
+        frappe.log_error(frappe.get_traceback(), "Get Salary Structures API Error")
+        return send_response("fail", str(e), None, 500, 500)
+
+@frappe.whitelist(allow_guest=False, methods=["GET"])
+def get_leave_policies():
+    try:
+        data = _fetch_paginated_autosuggest(
+            doctype="Leave Policy",
+            filters=frappe._dict({}),
+            search_fields=["name", "leave_policy_name"],
+            field_map={
+                "value": "name",
+                "label": "leave_policy_name",
+                "description": "name",
+            },
+        )
+        return send_response_list("success", "Leave Policies fetched successfully.", data)
+    except Exception as e:
+        frappe.log_error(frappe.get_traceback(), "Get Leave Policies API Error")
+        return send_response("fail", str(e), None, 500, 500)
+
+@frappe.whitelist(allow_guest=False, methods=["GET"])
+def get_leave_types():
+    try:
+        data = _fetch_paginated_autosuggest(
+            doctype="Leave Type",
+            filters=frappe._dict({}),
+            search_fields=["name", "leave_type_name"],
+            field_map={
+                "value": "name",
+                "label": "leave_type_name",
+                "description": "name",
+            },
+        )
+        return send_response_list("success", "Leave Types fetched successfully.", data)
+    except Exception as e:
+        frappe.log_error(frappe.get_traceback(), "Get Leave Types API Error")
+        return send_response("fail", str(e), None, 500, 500)
     
 @frappe.whitelist(allow_guest=False, methods=["GET"])
 def get_departments():
