@@ -130,7 +130,7 @@ def get_designations():
             filters=frappe._dict({}),
             search_fields=["name", "designation_name"],
             field_map={
-                "value": "designation_name",
+                "value": "name",
                 "label": "designation_name",
                 "description": "name",
             },
@@ -148,7 +148,7 @@ def get_departments():
             filters=frappe._dict({}),
             search_fields=["name", "department_name"],
             field_map={
-                "value": "department_name",
+                "value": "name",
                 "label": "department_name",
                 "description": "name",
             },
