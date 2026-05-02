@@ -126,7 +126,14 @@ def _fetch_paginated_autosuggest(
 def get_designations():
     try:
         data = _fetch_paginated_autosuggest(
-            "Designation", frappe._dict({}), ["name", "designation_name"]
+            doctype="Designation",
+            filters=frappe._dict({}),
+            search_fields=["name", "designation_name"],
+            field_map={
+                "value": "designation_name",
+                "label": "designation_name",
+                "description": "name",
+            },
         )
         return send_response_list("success", "Designations fetched successfully.", data)
     except Exception as e:
@@ -137,7 +144,14 @@ def get_designations():
 def get_departments():
     try:
         data = _fetch_paginated_autosuggest(
-            "Department", frappe._dict({}), ["name", "department_name"]
+            doctype="Department",
+            filters=frappe._dict({}),
+            search_fields=["name", "department_name"],
+            field_map={
+                "value": "department_name",
+                "label": "department_name",
+                "description": "name",
+            },
         )
         return send_response_list("success", "Departments fetched successfully.", data)
     except Exception as e:
