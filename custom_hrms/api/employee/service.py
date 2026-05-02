@@ -1,5 +1,8 @@
 import frappe
 from frappe.utils import today
+from frappe.utils.file_manager import save_file
+
+
 from .utils import (
     assign_salary_structure, 
     assign_leave_policy, 
@@ -147,3 +150,35 @@ def delete_employee(employee_id):
     frappe.db.delete("Salary Structure Assignment", {"employee": employee_id})
     frappe.db.delete("Leave Policy Assignment", {"employee": employee_id})
     frappe.delete_doc("Employee", employee_id, ignore_permissions=True)
+
+
+def update_employee_status(employee_id, status):
+    employee = frappe.get_doc("Employee", employee_id)
+    employee.status = status
+    employee.save(ignore_permissions=True)
+    
+    return {
+        "id": employee.name,
+        "status": employee.status,
+        "employee_name": employee.employee_name
+    }
+
+def upload_employee_image(employee_id, filename, file_content):
+    saved_file = save_file(
+        fname=filename,
+        content=file_content,
+        dt="Employee",
+        dn=employee_id,
+        folder="Home/Attachments",
+        is_private=0
+    )
+    
+    frappe.db.set_value(
+        "Employee", 
+        employee_id, 
+        "image", 
+        saved_file.file_url,
+        update_modified=True
+    )
+    
+    return saved_file.file_url

@@ -195,3 +195,112 @@ def delete_employee(id=None):
             status_code=500,
             http_status=500,
         )
+
+@frappe.whitelist(allow_guest=False, methods=["PUT", "PATCH"])
+def update_employee_status(id=None, status=None):
+    try:
+        emp_id = id or frappe.request.args.get("id")
+        new_status = status or frappe.request.args.get("status")
+
+        if not emp_id or not new_status:
+            return send_response(
+                status="fail",
+                message="Both 'id' and 'status' query parameters are required (?id=...&status=...).",
+                status_code=400,
+                http_status=400,
+            )
+
+        valid_statuses = ["Active", "Inactive", "Suspended", "Left"]
+        if new_status not in valid_statuses:
+            return send_response(
+                status="fail",
+                message=f"Invalid status '{new_status}'. Allowed values: {', '.join(valid_statuses)}",
+                status_code=400,
+                http_status=400,
+            )
+
+        if not frappe.db.exists("Employee", emp_id):
+            return send_response(
+                status="fail",
+                message="Employee not found",
+                status_code=404,
+                http_status=404,
+            )
+
+        result = service.update_employee_status(emp_id, new_status)
+        frappe.db.commit()
+
+        return send_response(
+            status="success",
+            message="Employee status updated successfully",
+            data=result,
+            status_code=200,
+            http_status=200,
+        )
+
+    except Exception as e:
+        frappe.db.rollback()
+        frappe.log_error(frappe.get_traceback(), "Update Employee Status API Error")
+        return send_response(
+            status="error",
+            message=str(e),
+            status_code=500,
+            http_status=500,
+        )
+
+@frappe.whitelist(allow_guest=False, methods=["POST"])
+def upload_employee_image(id=None):
+    try:
+        emp_id = id or frappe.request.args.get("id") or frappe.local.form_dict.get("id")
+
+        if not emp_id:
+            return send_response(
+                status="fail",
+                message="Employee 'id' is required.",
+                status_code=400,
+                http_status=400,
+            )
+
+        if not frappe.db.exists("Employee", emp_id):
+            return send_response(
+                status="fail",
+                message="Employee not found",
+                status_code=404,
+                http_status=404,
+            )
+
+        if "file" not in frappe.request.files:
+            return send_response(
+                status="fail",
+                message="No image provided. Please send a file using the 'file' form-data key.",
+                status_code=400,
+                http_status=400,
+            )
+
+        uploaded_file = frappe.request.files["file"]
+        
+        file_url = service.upload_employee_image(
+            employee_id=emp_id,
+            filename=uploaded_file.filename,
+            file_content=uploaded_file.read()
+        )
+        
+        frappe.db.commit()
+
+        return send_response(
+            status="success",
+            message="Employee image uploaded and linked successfully.",
+            data={"image_url": file_url},
+            status_code=200,
+            http_status=200,
+        )
+
+    except Exception as e:
+        frappe.db.rollback()
+        frappe.log_error(frappe.get_traceback(), "Upload Employee Image API Error")
+        return send_response(
+            status="error",
+            message=str(e),
+            status_code=500,
+            http_status=500,
+        )
