@@ -3,23 +3,21 @@ from custom_hrms.utils.response import send_response, send_response_list
 from ...utils.common_utils import parse_api_payload
 from . import service
 
+
 @frappe.whitelist(allow_guest=False, methods=["POST"])
 def create_employee():
     try:
         data = parse_api_payload()
-        
+
         employee_data = service.create_employee(data)
-        
+
         messages = f"Welcome email sent to {employee_data.company_email} please check and create login account for employee."
         frappe.db.commit()
 
         return send_response(
             status="success",
             message="Employee created successfully.",
-            data={
-                "employee": employee_data.employee,
-                "messages": messages
-            },
+            data={"employee": employee_data.employee, "messages": messages},
             status_code=201,
             http_status=201,
         )
@@ -33,6 +31,7 @@ def create_employee():
             status_code=500,
             http_status=500,
         )
+
 
 @frappe.whitelist(allow_guest=False, methods=["PUT", "PATCH"])
 def update_employee(id=None):
@@ -57,7 +56,7 @@ def update_employee(id=None):
 
         employee_data = service.update_employee(employee_id, data)
         frappe.db.commit()
-        
+
         return send_response(
             status="success",
             message="Employee updated successfully",
@@ -75,6 +74,7 @@ def update_employee(id=None):
             status_code=500,
             http_status=500,
         )
+
 
 @frappe.whitelist(allow_guest=False, methods=["GET"])
 def get_employee_by_id(id):
@@ -105,25 +105,26 @@ def get_employee_by_id(id):
             http_status=500,
         )
 
+
 @frappe.whitelist(allow_guest=False, methods=["GET"])
 def get_employees(page=1, page_size=20):
     args = frappe.local.form_dict
-    
+
     search = args.get("search")
-    filters = args.get("filters", "{}") 
+    filters = args.get("filters", "{}")
     sort_by = args.get("sort_by", "creation")
     sort_order = args.get("sort_order", "desc")
-    
+
     try:
         page, page_size = int(page), int(page_size)
-        
+
         employees, total_employees, total_pages = service.get_employees(
-            filters=filters, 
-            page=page, 
-            page_size=page_size, 
+            filters=filters,
+            page=page,
+            page_size=page_size,
             search=search,
             sort_by=sort_by,
-            sort_order=sort_order
+            sort_order=sort_order,
         )
 
         response_data = {
@@ -157,6 +158,7 @@ def get_employees(page=1, page_size=20):
             http_status=500,
         )
 
+
 @frappe.whitelist(allow_guest=False, methods=["DELETE"])
 def delete_employee(id=None):
     try:
@@ -178,7 +180,7 @@ def delete_employee(id=None):
 
         service.delete_employee(employee_id)
         frappe.db.commit()
-        
+
         return send_response(
             status="success",
             message="Employee deleted successfully",
@@ -195,6 +197,7 @@ def delete_employee(id=None):
             status_code=500,
             http_status=500,
         )
+
 
 @frappe.whitelist(allow_guest=False, methods=["PUT", "PATCH"])
 def update_employee_status(id=None, status=None):
@@ -248,6 +251,7 @@ def update_employee_status(id=None, status=None):
             http_status=500,
         )
 
+
 @frappe.whitelist(allow_guest=False, methods=["POST"])
 def upload_employee_image(id=None):
     try:
@@ -278,13 +282,13 @@ def upload_employee_image(id=None):
             )
 
         uploaded_file = frappe.request.files["file"]
-        
+
         file_url = service.upload_employee_image(
             employee_id=emp_id,
             filename=uploaded_file.filename,
-            file_content=uploaded_file.read()
+            file_content=uploaded_file.read(),
         )
-        
+
         frappe.db.commit()
 
         return send_response(
@@ -303,4 +307,280 @@ def upload_employee_image(id=None):
             message=str(e),
             status_code=500,
             http_status=500,
+        )
+
+
+@frappe.whitelist(allow_guest=False, methods=["POST", "PUT", "PATCH"])
+def update_employee_image(id=None):
+    try:
+        emp_id = id or frappe.request.args.get("id") or frappe.local.form_dict.get("id")
+
+        if not emp_id:
+            return send_response(
+                status="fail",
+                message="Employee 'id' is required.",
+                status_code=400,
+                http_status=400,
+            )
+
+        if not frappe.db.exists("Employee", emp_id):
+            return send_response(
+                status="fail",
+                message="Employee not found",
+                status_code=404,
+                http_status=404,
+            )
+
+        if "file" not in frappe.request.files:
+            return send_response(
+                status="fail",
+                message="No new image provided. Please send a file using the 'file' form-data key.",
+                status_code=400,
+                http_status=400,
+            )
+
+        uploaded_file = frappe.request.files["file"]
+
+        new_file_url = service.update_employee_image(
+            employee_id=emp_id,
+            filename=uploaded_file.filename,
+            file_content=uploaded_file.read(),
+        )
+
+        frappe.db.commit()
+
+        return send_response(
+            status="success",
+            message="Employee image updated successfully.",
+            data={"image_url": new_file_url},
+            status_code=200,
+            http_status=200,
+        )
+
+    except Exception as e:
+        frappe.db.rollback()
+        frappe.log_error(frappe.get_traceback(), "Update Employee Image API Error")
+        return send_response(
+            status="error",
+            message=str(e),
+            status_code=500,
+            http_status=500,
+        )
+
+
+@frappe.whitelist(allow_guest=False, methods=["POST", "DELETE"])
+def remove_employee_image(id=None):
+    try:
+        emp_id = id or frappe.request.args.get("id") or frappe.local.form_dict.get("id")
+
+        if not emp_id:
+            return send_response(
+                status="fail",
+                message="Employee 'id' is required.",
+                status_code=400,
+                http_status=400,
+            )
+
+        if not frappe.db.exists("Employee", emp_id):
+            return send_response(
+                status="fail",
+                message="Employee not found",
+                status_code=404,
+                http_status=404,
+            )
+
+        service.remove_employee_image(emp_id)
+
+        frappe.db.commit()
+
+        return send_response(
+            status="success",
+            message="Employee image removed successfully.",
+            status_code=200,
+            http_status=200,
+        )
+
+    except Exception as e:
+        frappe.db.rollback()
+        frappe.log_error(frappe.get_traceback(), "Remove Employee Image API Error")
+        return send_response(
+            status="error",
+            message=str(e),
+            status_code=500,
+            http_status=500,
+        )
+
+
+@frappe.whitelist(allow_guest=False, methods=["GET"])
+def get_employee_documents(id=None):
+    try:
+        emp_id = id or frappe.request.args.get("id")
+
+        if not emp_id:
+            return send_response(
+                status="fail",
+                message="Employee 'id' required",
+                status_code=400,
+                http_status=400,
+            )
+
+        if not frappe.db.exists("Employee", emp_id):
+            return send_response(
+                status="fail",
+                message="Employee not found",
+                status_code=404,
+                http_status=404,
+            )
+
+        documents = service.get_employee_documents(emp_id)
+
+        return send_response(
+            status="success",
+            message="Documents retrieved successfully",
+            data=documents,
+            status_code=200,
+            http_status=200,
+        )
+
+    except Exception as e:
+        frappe.log_error(frappe.get_traceback(), "Get Employee Documents Error")
+        return send_response(
+            status="error", message=str(e), status_code=500, http_status=500
+        )
+
+
+@frappe.whitelist(allow_guest=False, methods=["GET"])
+def get_employee_document_by_id(file_id=None):
+    try:
+        file_id = file_id or frappe.request.args.get("file_id")
+
+        if not file_id:
+            return send_response(
+                status="fail",
+                message="Parameter 'file_id' required",
+                status_code=400,
+                http_status=400,
+            )
+
+        if not frappe.db.exists("File", file_id):
+            return send_response(
+                status="fail",
+                message="Document not found",
+                status_code=404,
+                http_status=404,
+            )
+
+        doc_data = service.get_employee_document_by_id(file_id)
+
+        return send_response(
+            status="success",
+            message="Document retrieved",
+            data=doc_data,
+            status_code=200,
+            http_status=200,
+        )
+
+    except Exception as e:
+        frappe.log_error(frappe.get_traceback(), "Get Employee Document Error")
+        return send_response(
+            status="error", message=str(e), status_code=500, http_status=500
+        )
+
+
+@frappe.whitelist(allow_guest=False, methods=["POST", "PUT"])
+def update_employee_document(file_id=None):
+    try:
+        form = frappe.local.form_dict
+        f_id = file_id or form.get("file_id")
+        document_name = form.get("document_name")
+
+        if not f_id:
+            return send_response(
+                status="fail",
+                message="Parameter 'file_id' required",
+                status_code=400,
+                http_status=400,
+            )
+
+        if not frappe.db.exists("File", f_id):
+            return send_response(
+                status="fail",
+                message="Document not found",
+                status_code=404,
+                http_status=404,
+            )
+
+        new_file_content = None
+        new_filename = None
+
+        uploaded_file = frappe.request.files.get("file")
+        if uploaded_file:
+            new_file_content = uploaded_file.stream.read()
+            new_filename = uploaded_file.filename
+
+        updated_doc = service.update_employee_document(
+            file_id=f_id,
+            new_document_name=document_name,
+            new_file_content=new_file_content,
+            new_filename=new_filename,
+        )
+
+        frappe.db.commit()
+
+        return send_response(
+            status="success",
+            message="Document updated successfully",
+            data={
+                "file_id": updated_doc.name,
+                "document_name": updated_doc.file_name,
+                "file_url": updated_doc.file_url,
+            },
+            status_code=200,
+            http_status=200,
+        )
+
+    except Exception as e:
+        frappe.db.rollback()
+        frappe.log_error(frappe.get_traceback(), "Update Employee Document Error")
+        return send_response(
+            status="error", message=str(e), status_code=500, http_status=500
+        )
+
+
+@frappe.whitelist(allow_guest=False, methods=["DELETE"])
+def delete_employee_document(file_id=None):
+    try:
+        f_id = file_id or frappe.local.form_dict.get("file_id")
+
+        if not f_id:
+            return send_response(
+                status="fail",
+                message="Parameter 'file_id' required",
+                status_code=400,
+                http_status=400,
+            )
+
+        if not frappe.db.exists("File", f_id):
+            return send_response(
+                status="fail",
+                message="Document not found",
+                status_code=404,
+                http_status=404,
+            )
+
+        service.delete_employee_document(f_id)
+        frappe.db.commit()
+
+        return send_response(
+            status="success",
+            message="Document deleted successfully",
+            status_code=200,
+            http_status=200,
+        )
+
+    except Exception as e:
+        frappe.db.rollback()
+        frappe.log_error(frappe.get_traceback(), "Delete Employee Document Error")
+        return send_response(
+            status="error", message=str(e), status_code=500, http_status=500
         )
