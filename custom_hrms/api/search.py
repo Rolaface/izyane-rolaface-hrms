@@ -146,10 +146,10 @@ def get_salary_structures():
         data = _fetch_paginated_autosuggest(
             doctype="Salary Structure",
             filters=frappe._dict({}),
-            search_fields=["name", "salary_structure_name"],
+            search_fields=["name"],
             field_map={
                 "value": "name",
-                "label": "salary_structure_name",
+                "label": "name",
                 "description": "name",
             },
         )
