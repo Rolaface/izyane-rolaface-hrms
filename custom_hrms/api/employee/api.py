@@ -1,8 +1,9 @@
+import os
 import frappe
 from custom_hrms.utils.response import send_response, send_response_list
 from ...utils.common_utils import parse_api_payload
 from . import service
-
+from .utils import ALLOWED_IMAGE_EXTENSIONS
 
 @frappe.whitelist(allow_guest=False, methods=["POST"])
 def create_employee():
@@ -251,7 +252,6 @@ def update_employee_status(id=None, status=None):
             http_status=500,
         )
 
-
 @frappe.whitelist(allow_guest=False, methods=["POST"])
 def upload_employee_image(id=None):
     try:
@@ -276,12 +276,21 @@ def upload_employee_image(id=None):
         if "file" not in frappe.request.files:
             return send_response(
                 status="fail",
-                message="No image provided. Please send a file using the 'file' form-data key.",
+                message="No image provided. Please send a file using the 'file' key.",
                 status_code=400,
                 http_status=400,
             )
 
         uploaded_file = frappe.request.files["file"]
+
+        file_ext = os.path.splitext(uploaded_file.filename)[1].lower()
+        if file_ext not in ALLOWED_IMAGE_EXTENSIONS:
+            return send_response(
+                status="fail",
+                message=f"Invalid file type '{file_ext}'. Allowed types are: {', '.join(ALLOWED_IMAGE_EXTENSIONS)}",
+                status_code=400,
+                http_status=400,
+            )
 
         file_url = service.upload_employee_image(
             employee_id=emp_id,
@@ -293,20 +302,17 @@ def upload_employee_image(id=None):
 
         return send_response(
             status="success",
-            message="Employee image uploaded and linked successfully.",
+            message="Employee image uploaded successfully.",
             data={"image_url": file_url},
-            status_code=200,
-            http_status=200,
+            status_code=201,
+            http_status=201,
         )
 
     except Exception as e:
         frappe.db.rollback()
         frappe.log_error(frappe.get_traceback(), "Upload Employee Image API Error")
         return send_response(
-            status="error",
-            message=str(e),
-            status_code=500,
-            http_status=500,
+            status="error", message=str(e), status_code=500, http_status=500
         )
 
 
@@ -334,12 +340,21 @@ def update_employee_image(id=None):
         if "file" not in frappe.request.files:
             return send_response(
                 status="fail",
-                message="No new image provided. Please send a file using the 'file' form-data key.",
+                message="No new image provided.",
                 status_code=400,
                 http_status=400,
             )
 
         uploaded_file = frappe.request.files["file"]
+
+        file_ext = os.path.splitext(uploaded_file.filename)[1].lower()
+        if file_ext not in ALLOWED_IMAGE_EXTENSIONS:
+            return send_response(
+                status="fail",
+                message=f"Invalid file type '{file_ext}'. Allowed types are: {', '.join(ALLOWED_IMAGE_EXTENSIONS)}",
+                status_code=400,
+                http_status=400,
+            )
 
         new_file_url = service.update_employee_image(
             employee_id=emp_id,
@@ -361,10 +376,7 @@ def update_employee_image(id=None):
         frappe.db.rollback()
         frappe.log_error(frappe.get_traceback(), "Update Employee Image API Error")
         return send_response(
-            status="error",
-            message=str(e),
-            status_code=500,
-            http_status=500,
+            status="error", message=str(e), status_code=500, http_status=500
         )
 
 

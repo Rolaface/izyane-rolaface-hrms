@@ -177,6 +177,8 @@ RETURN_EMPLOYEE_FIELDS_GET_BY_ID = [
     "attendance_device_id",
 ]
 
+ALLOWED_IMAGE_EXTENSIONS = {".jpg", ".jpeg", ".png", ".gif", ".webp", ".svg"}
+
 
 def build_advanced_filters(raw_filters):
     safe_filters = {}
