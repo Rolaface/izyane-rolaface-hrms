@@ -179,6 +179,13 @@ RETURN_EMPLOYEE_FIELDS_GET_BY_ID = [
 
 ALLOWED_IMAGE_EXTENSIONS = {".jpg", ".jpeg", ".png", ".gif", ".webp", ".svg"}
 
+ALLOWED_EXTENDED_FIELDS = [
+    "national_identification_number",
+    "tax_identification_number",
+    "universal_account_number",
+    "health_insurance_number",
+]
+
 
 def build_advanced_filters(raw_filters):
     safe_filters = {}

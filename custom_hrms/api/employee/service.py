@@ -7,6 +7,7 @@ from .utils import (
     assign_salary_structure,
     assign_leave_policy,
     ALLOWED_EMPLOYEE_FIELDS,
+    ALLOWED_EXTENDED_FIELDS,
     RETURN_EMPLOYEE_FIELDS_GET_ALL,
     RETURN_EMPLOYEE_FIELDS_GET_BY_ID,
     build_advanced_filters,
@@ -25,22 +26,27 @@ def create_employee(data):
     if not employee.date_of_joining:
         employee.date_of_joining = today()
 
+    ext_details_data = {}
+    for ext_field in ALLOWED_EXTENDED_FIELDS:
+        if ext_field in data and data.get(ext_field) is not None:
+            ext_details_data[ext_field] = data.get(ext_field)
+
+    if ext_details_data:
+        employee.append("custom_extended_details", ext_details_data)
+
     employee.insert(ignore_permissions=True)
 
     if data.get("salary_structure"):
         assign_salary_structure(
-            employee=employee.name,
-            salary_structure=data.get("salary_structure"),
-            company=employee.company,
-            from_date=employee.date_of_joining,
-            base_salary=data.get("base_salary", 0),
+            employee.name,
+            data.get("salary_structure"),
+            employee.company,
+            employee.date_of_joining,
+            data.get("base_salary", 0),
         )
-
     if data.get("leave_policy"):
         assign_leave_policy(
-            employee=employee.name,
-            leave_policy=data.get("leave_policy"),
-            from_date=employee.date_of_joining,
+            employee.name, data.get("leave_policy"), employee.date_of_joining
         )
 
     return get_employee_by_id(employee.name)
@@ -53,22 +59,31 @@ def update_employee(employee_id, data):
         if field in data and data.get(field) is not None:
             employee.set(field, data.get(field))
 
+    if any(field in data for field in ALLOWED_EXTENDED_FIELDS):
+        ext_details_data = {}
+        for ext_field in ALLOWED_EXTENDED_FIELDS:
+            if ext_field in data and data.get(ext_field) is not None:
+                ext_details_data[ext_field] = data.get(ext_field)
+
+        employee.set("custom_extended_details", [])
+        if ext_details_data:
+            employee.append("custom_extended_details", ext_details_data)
+
     employee.save(ignore_permissions=True)
 
     if data.get("salary_structure"):
         assign_salary_structure(
-            employee=employee.name,
-            salary_structure=data.get("salary_structure"),
-            company=employee.company,
-            from_date=data.get("effective_date") or today(),
-            base_salary=data.get("base_salary", 0),
+            employee.name,
+            data.get("salary_structure"),
+            employee.company,
+            data.get("effective_date") or today(),
+            data.get("base_salary", 0),
         )
-
     if data.get("leave_policy"):
         assign_leave_policy(
-            employee=employee.name,
-            leave_policy=data.get("leave_policy"),
-            from_date=data.get("effective_date") or today(),
+            employee.name,
+            data.get("leave_policy"),
+            data.get("effective_date") or today(),
         )
 
     return get_employee_by_id(employee.name)
@@ -79,22 +94,31 @@ def get_employee_by_id(employee_id):
         "Employee", employee_id, RETURN_EMPLOYEE_FIELDS_GET_BY_ID, as_dict=True
     )
 
-    active_salary_structure = frappe.db.get_value(
+    employee_data["salary_structure"] = frappe.db.get_value(
         "Salary Structure Assignment",
         {"employee": employee_id, "docstatus": 1},
         "salary_structure",
         order_by="from_date desc",
     )
-
-    active_leave_policy = frappe.db.get_value(
+    employee_data["leave_policy"] = frappe.db.get_value(
         "Leave Policy Assignment",
         {"employee": employee_id, "docstatus": 1},
         "leave_policy",
         order_by="effective_from desc",
     )
 
-    employee_data["salary_structure"] = active_salary_structure
-    employee_data["leave_policy"] = active_leave_policy
+    extended_details = frappe.get_all(
+        "Custom Employee Extended Details",
+        filters={"parent": employee_id, "parenttype": "Employee"},
+        fields=ALLOWED_EXTENDED_FIELDS,
+    )
+
+    if extended_details:
+        for key, value in extended_details[0].items():
+            employee_data[key] = value
+    else:
+        for field in ALLOWED_EXTENDED_FIELDS:
+            employee_data[field] = None
 
     return employee_data
 

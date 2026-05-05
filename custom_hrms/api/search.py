@@ -164,10 +164,10 @@ def get_leave_policies():
         data = _fetch_paginated_autosuggest(
             doctype="Leave Policy",
             filters=frappe._dict({}),
-            search_fields=["name", "leave_policy_name"],
+            search_fields=["name", "title"],
             field_map={
                 "value": "name",
-                "label": "leave_policy_name",
+                "label": "title",
                 "description": "name",
             },
         )
