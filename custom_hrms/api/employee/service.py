@@ -6,6 +6,7 @@ import os
 from .utils import (
     assign_salary_structure,
     assign_leave_policy,
+    assign_holiday_list,
     ALLOWED_EMPLOYEE_FIELDS,
     ALLOWED_EXTENDED_FIELDS,
     RETURN_EMPLOYEE_FIELDS_GET_ALL,
@@ -15,41 +16,68 @@ from .utils import (
 
 
 def create_employee(data):
-    employee = frappe.new_doc("Employee")
+    default_company = frappe.defaults.get_user_default("Company")
+    current_date = today()
 
-    for field in ALLOWED_EMPLOYEE_FIELDS:
-        if field in data and data.get(field) is not None:
-            employee.set(field, data.get(field))
+    try:
+        employee = frappe.new_doc("Employee")
 
-    if not employee.company:
-        employee.company = frappe.defaults.get_user_default("Company")
-    if not employee.date_of_joining:
-        employee.date_of_joining = today()
+        for field in ALLOWED_EMPLOYEE_FIELDS:
+            if field in data and data.get(field) is not None:
+                employee.set(field, data.get(field))
 
-    ext_details_data = {}
-    for ext_field in ALLOWED_EXTENDED_FIELDS:
-        if ext_field in data and data.get(ext_field) is not None:
-            ext_details_data[ext_field] = data.get(ext_field)
+        if not employee.get("company"):
+            employee.company = default_company
 
-    if ext_details_data:
-        employee.append("custom_extended_details", ext_details_data)
+        if not employee.get("date_of_joining"):
+            employee.date_of_joining = current_date
 
-    employee.insert(ignore_permissions=True)
+        current_company = employee.get("company")
 
-    if data.get("salary_structure"):
-        assign_salary_structure(
-            employee.name,
-            data.get("salary_structure"),
-            employee.company,
-            employee.date_of_joining,
-            data.get("base_salary", 0),
-        )
-    if data.get("leave_policy"):
-        assign_leave_policy(
-            employee.name, data.get("leave_policy"), employee.date_of_joining
-        )
+        if not employee.get("holiday_list") and current_company:
+            default_holiday = frappe.db.get_value(
+                "Company", current_company, "default_holiday_list"
+            )
+            if default_holiday:
+                employee.holiday_list = default_holiday
 
-    return get_employee_by_id(employee.name)
+        ext_details_data = {}
+        for ext_field in ALLOWED_EXTENDED_FIELDS:
+            if ext_field in data and data.get(ext_field) is not None:
+                ext_details_data[ext_field] = data.get(ext_field)
+
+        if ext_details_data:
+            child_row = employee.append("custom_extended_details", {})
+            child_row.update(ext_details_data)
+
+        employee.insert(ignore_permissions=True)
+
+        if data.get("salary_structure"):
+            assign_salary_structure(
+                employee.name,
+                data.get("salary_structure"),
+                current_company,
+                employee.get("date_of_joining"),
+                data.get("base_salary", 0),
+            )
+
+        if data.get("leave_policy"):
+            assign_leave_policy(
+                employee.name, data.get("leave_policy"), employee.get("date_of_joining")
+            )
+
+        if employee.get("holiday_list"):
+            assign_holiday_list(
+                employee.name,
+                employee.get("holiday_list"),
+                employee.get("date_of_joining"),
+            )
+
+        return get_employee_by_id(employee.name)
+
+    except Exception as e:
+        frappe.db.rollback()
+        raise e
 
 
 def update_employee(employee_id, data):

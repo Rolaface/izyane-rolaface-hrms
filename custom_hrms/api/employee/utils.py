@@ -1,6 +1,7 @@
 import frappe
 import json
 from frappe.utils import flt
+from frappe.utils import flt, getdate, add_days, add_months
 
 ALLOWED_EMPLOYEE_FIELDS = {
     "valid_upto",
@@ -78,6 +79,7 @@ ALLOWED_EMPLOYEE_FIELDS = {
     "bank_name",
     "bank_ac_no",
     "attendance_device_id",
+    "holiday_list",
 }
 
 RETURN_EMPLOYEE_FIELDS_GET_ALL = [
@@ -175,6 +177,7 @@ RETURN_EMPLOYEE_FIELDS_GET_BY_ID = [
     "bank_name",
     "bank_ac_no",
     "attendance_device_id",
+    "holiday_list",
 ]
 
 ALLOWED_IMAGE_EXTENSIONS = {".jpg", ".jpeg", ".png", ".gif", ".webp", ".svg"}
@@ -211,13 +214,14 @@ def assign_salary_structure(
     if not frappe.db.exists("Salary Structure", salary_structure):
         frappe.throw(f"Salary Structure '{salary_structure}' not found.")
 
-    existing = frappe.db.exists(
-        "Salary Structure Assignment",
-        {"employee": employee, "from_date": from_date, "docstatus": 1},
+    existing = frappe.db.get_value(
+        "Salary Structure Assignment", {"employee": employee, "docstatus": 1}, "name"
     )
 
     if existing:
-        return
+        frappe.throw(
+            f"An active Salary Structure Assignment ({existing}) already exists for {employee}."
+        )
 
     assignment = frappe.new_doc("Salary Structure Assignment")
     assignment.employee = employee
@@ -225,6 +229,11 @@ def assign_salary_structure(
     assignment.company = company
     assignment.from_date = from_date
     assignment.base = flt(base_salary)
+
+    # if frappe.db.get_value("Salary Structure", salary_structure, "is_tax_applicable"):
+    #     default_tax_slab = frappe.db.get_value("Income Tax Slab", {"company": company, "disabled": 0}, "name")
+    #     if default_tax_slab:
+    #         assignment.income_tax_slab = default_tax_slab
 
     assignment.insert(ignore_permissions=True)
     assignment.submit()
@@ -234,25 +243,72 @@ def assign_leave_policy(employee, leave_policy, from_date):
     if not frappe.db.exists("Leave Policy", leave_policy):
         frappe.throw(f"Leave Policy '{leave_policy}' not found.")
 
+    existing = frappe.db.exists(
+        "Leave Policy Assignment",
+        {"employee": employee, "docstatus": 1},
+    )
+
+    if existing:
+        frappe.throw(
+            f"An active Leave Policy Assignment already exists for {employee}."
+        )
+
     assignment = frappe.new_doc("Leave Policy Assignment")
     assignment.employee = employee
     assignment.leave_policy = leave_policy
     assignment.assignment_based_on = "Leave Period"
 
-    leave_period = frappe.db.get_value(
+    leave_period_data = frappe.db.get_value(
         "Leave Period",
         {"from_date": ["<=", from_date], "to_date": [">=", from_date], "is_active": 1},
-        "name",
+        ["name", "from_date", "to_date"],
+        as_dict=True,
     )
 
-    if leave_period:
-        assignment.leave_period = leave_period
+    if leave_period_data:
+        assignment.leave_period = leave_period_data.name
+        assignment.effective_from = leave_period_data.from_date
+        assignment.effective_to = leave_period_data.to_date
     else:
         assignment.assignment_based_on = None
         assignment.effective_from = from_date
-        assignment.effective_to = frappe.utils.add_days(
-            frappe.utils.add_months(from_date, 12), -1
+        assignment.effective_to = add_days(add_months(from_date, 12), -1)
+
+    assignment.insert(ignore_permissions=True)
+    assignment.submit()
+
+
+def assign_holiday_list(employee, holiday_list, from_date):
+    if not frappe.db.exists("Holiday List", holiday_list):
+        frappe.throw(f"Holiday List '{holiday_list}' not found.")
+
+    hl_start_date, hl_end_date = frappe.db.get_value(
+        "Holiday List", holiday_list, ["from_date", "to_date"]
+    )
+
+    assignment_date = getdate(from_date)
+
+    if hl_start_date and assignment_date < getdate(hl_start_date):
+        assignment_date = getdate(hl_start_date)
+
+    if hl_end_date and assignment_date > getdate(hl_end_date):
+        return
+
+    existing_assignment = frappe.db.exists(
+        "Holiday List Assignment", {"employee": employee, "docstatus": 1}
+    )
+
+    if existing_assignment:
+        frappe.throw(
+            f"An active Holiday List Assignment already exists for {employee}."
         )
+
+    assignment = frappe.new_doc("Holiday List Assignment")
+
+    assignment.employee = employee
+    assignment.assigned_to = employee
+    assignment.holiday_list = holiday_list
+    assignment.from_date = assignment_date
 
     assignment.insert(ignore_permissions=True)
     assignment.submit()
