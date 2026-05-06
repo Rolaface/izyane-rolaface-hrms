@@ -5,6 +5,7 @@ from ...utils.common_utils import parse_api_payload
 from . import service
 from .utils import ALLOWED_IMAGE_EXTENSIONS
 
+
 @frappe.whitelist(allow_guest=False, methods=["POST"])
 def create_employee():
     try:
@@ -252,6 +253,7 @@ def update_employee_status(id=None, status=None):
             http_status=500,
         )
 
+
 @frappe.whitelist(allow_guest=False, methods=["POST"])
 def upload_employee_image(id=None):
     try:
@@ -418,6 +420,116 @@ def remove_employee_image(id=None):
         return send_response(
             status="error",
             message=str(e),
+            status_code=500,
+            http_status=500,
+        )
+
+
+@frappe.whitelist(allow_guest=False, methods=["POST"])
+def upload_employee_document(id=None):
+    try:
+        emp_id = id or frappe.request.args.get("id") or frappe.local.form_dict.get("id")
+
+        document_name = frappe.request.args.get(
+            "document_name"
+        ) or frappe.local.form_dict.get("document_name")
+
+        if not emp_id:
+            return send_response(
+                status="fail",
+                message="Employee 'id' is required.",
+                status_code=400,
+                http_status=400,    
+            )
+
+        if not document_name:
+            return send_response(
+                status="fail",
+                message="'document_name' is required.",
+                status_code=400,
+                http_status=400,
+            )
+
+        if not frappe.db.exists("Employee", emp_id):
+            return send_response(
+                status="fail",
+                message="Employee not found.",
+                status_code=404,
+                http_status=404,
+            )
+
+        if "file" not in frappe.request.files:
+            return send_response(
+                status="fail",
+                message="No document provided. Please send a file using the 'file' key.",
+                status_code=400,
+                http_status=400,
+            )
+
+        uploaded_file = frappe.request.files["file"]
+
+        if not uploaded_file or not uploaded_file.filename:
+            return send_response(
+                status="fail",
+                message="Invalid uploaded file.",
+                status_code=400,
+                http_status=400,
+            )
+
+        file_content = uploaded_file.read()
+
+        if not file_content:
+            return send_response(
+                status="fail",
+                message="Uploaded file is empty.",
+                status_code=400,
+                http_status=400,
+            )
+
+        saved_file_doc = service.upload_employee_document(
+            employee_id=emp_id,
+            filename=uploaded_file.filename,
+            file_content=file_content,
+            document_name=document_name,
+        )
+
+        frappe.db.commit()
+
+        return send_response(
+            status="success",
+            message=f"{document_name} uploaded successfully.",
+            data={
+                "file_id": saved_file_doc.name,
+                "document_name": saved_file_doc.file_name,
+                "file_url": saved_file_doc.file_url,
+                "is_private": saved_file_doc.is_private,
+            },
+            status_code=201,
+            http_status=201,
+        )
+
+    except frappe.ValidationError as e:
+        frappe.db.rollback()
+
+        return send_response(
+            status="fail",
+            message=str(e),
+            status_code=400,
+            http_status=400,
+        )
+
+    except Exception as e:
+        frappe.db.rollback()
+
+        frappe.log_error(
+            frappe.get_traceback(),
+            "Upload Employee Document API Error",
+        )
+
+        return send_response(
+            status="error",
+            message="Failed to upload employee document.",
+            data={"error": str(e)},
             status_code=500,
             http_status=500,
         )
