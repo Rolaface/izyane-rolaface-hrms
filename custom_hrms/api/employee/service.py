@@ -100,19 +100,45 @@ def update_employee(employee_id, data):
     employee.save(ignore_permissions=True)
 
     if data.get("salary_structure"):
-        assign_salary_structure(
-            employee.name,
-            data.get("salary_structure"),
-            employee.company,
-            data.get("effective_date") or today(),
-            data.get("base_salary", 0),
+        current_salary = frappe.db.get_value(
+            "Salary Structure Assignment",
+            {"employee": employee_id, "docstatus": 1},
+            "salary_structure",
         )
+        if current_salary != data.get("salary_structure"):
+            assign_salary_structure(
+                employee.name,
+                data.get("salary_structure"),
+                employee.company,
+                data.get("effective_date") or today(),
+                data.get("base_salary", 0),
+            )
+
     if data.get("leave_policy"):
-        assign_leave_policy(
-            employee.name,
-            data.get("leave_policy"),
-            data.get("effective_date") or today(),
+        current_leave = frappe.db.get_value(
+            "Leave Policy Assignment",
+            {"employee": employee_id, "docstatus": 1},
+            "leave_policy",
         )
+        if current_leave != data.get("leave_policy"):
+            assign_leave_policy(
+                employee.name,
+                data.get("leave_policy"),
+                data.get("effective_date") or today(),
+            )
+
+    if data.get("holiday_list"):
+        current_holiday = frappe.db.get_value(
+            "Holiday List Assignment",
+            {"employee": employee_id, "docstatus": 1},
+            "holiday_list",
+        )
+        if current_holiday != data.get("holiday_list"):
+            assign_holiday_list(
+                employee.name,
+                data.get("holiday_list"),
+                data.get("effective_date") or today(),
+            )
 
     return get_employee_by_id(employee.name)
 
@@ -189,6 +215,29 @@ def get_employees(
         limit_page_length=page_size,
         order_by=order_by_string,
     )
+
+    employee_names = [emp["name"] for emp in employees]
+
+    if employee_names:
+        fields_to_fetch = ["parent"] + ALLOWED_EXTENDED_FIELDS
+        all_extended_details = frappe.get_all(
+            "Custom Employee Extended Details",
+            filters={"parent": ["in", employee_names], "parenttype": "Employee"},
+            fields=fields_to_fetch,
+        )
+
+        details_map = {row["parent"]: row for row in all_extended_details}
+
+        for emp in employees:
+            emp_details = details_map.get(emp["name"], {})
+            emp_details.pop("parent", None)
+
+            if emp_details:
+                for key, value in emp_details.items():
+                    emp[key] = value
+            else:
+                for field in ALLOWED_EXTENDED_FIELDS:
+                    emp[field] = None
 
     total_employees = len(
         frappe.get_all(
