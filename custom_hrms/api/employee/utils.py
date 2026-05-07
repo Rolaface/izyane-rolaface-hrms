@@ -209,13 +209,20 @@ def build_advanced_filters(raw_filters):
 
 
 def assign_salary_structure(
-    employee, salary_structure, company, from_date, base_salary
+    employee,
+    salary_structure,
+    company,
+    from_date,
+    base_salary,
+    income_tax_slab=None,
 ):
     if not frappe.db.exists("Salary Structure", salary_structure):
         frappe.throw(f"Salary Structure '{salary_structure}' not found.")
 
     existing = frappe.db.get_value(
-        "Salary Structure Assignment", {"employee": employee, "docstatus": 1}, "name"
+        "Salary Structure Assignment",
+        {"employee": employee, "docstatus": 1},
+        "name",
     )
 
     if existing:
@@ -230,13 +237,26 @@ def assign_salary_structure(
     assignment.from_date = from_date
     assignment.base = flt(base_salary)
 
-    # if frappe.db.get_value("Salary Structure", salary_structure, "is_tax_applicable"):
-    #     default_tax_slab = frappe.db.get_value("Income Tax Slab", {"company": company, "disabled": 0}, "name")
-    #     if default_tax_slab:
-    #         assignment.income_tax_slab = default_tax_slab
+    selected_tax_slab = income_tax_slab
+
+    if not selected_tax_slab:
+        selected_tax_slab = frappe.db.get_value(
+            "Income Tax Slab",
+            {
+                "company": company,
+                "disabled": 0,
+            },
+            "name",
+            order_by="creation asc",
+        )
+
+    if selected_tax_slab:
+        assignment.income_tax_slab = selected_tax_slab
 
     assignment.insert(ignore_permissions=True)
     assignment.submit()
+
+    return assignment
 
 
 def assign_leave_policy(employee, leave_policy, from_date):

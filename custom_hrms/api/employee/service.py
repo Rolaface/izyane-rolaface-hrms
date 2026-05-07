@@ -54,11 +54,12 @@ def create_employee(data):
 
         if data.get("salary_structure"):
             assign_salary_structure(
-                employee.name,
-                data.get("salary_structure"),
-                current_company,
-                employee.get("date_of_joining"),
-                data.get("base_salary", 0),
+                employee=employee.name,
+                salary_structure=data.get("salary_structure"),
+                company=current_company,
+                from_date=employee.get("date_of_joining"),
+                base_salary=data.get("base_salary", 0),
+                income_tax_slab=data.get("income_tax_slab"),
             )
 
         if data.get("leave_policy"):
@@ -105,13 +106,15 @@ def update_employee(employee_id, data):
             {"employee": employee_id, "docstatus": 1},
             "salary_structure",
         )
+
         if current_salary != data.get("salary_structure"):
             assign_salary_structure(
-                employee.name,
-                data.get("salary_structure"),
-                employee.company,
-                data.get("effective_date") or today(),
-                data.get("base_salary", 0),
+                employee=employee.name,
+                salary_structure=data.get("salary_structure"),
+                company=employee.company,
+                from_date=data.get("effective_date") or today(),
+                base_salary=data.get("base_salary", 0),
+                income_tax_slab=data.get("income_tax_slab"),
             )
 
     if data.get("leave_policy"):
