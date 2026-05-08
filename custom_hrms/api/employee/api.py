@@ -13,7 +13,7 @@ def create_employee():
 
         employee_data = service.create_employee(data)
 
-        messages = f"Welcome email sent to {employee_data.company_email} please check and create login account for employee."
+        messages = f" A welcome email has been sent to {employee_data.company_email}. Kindly check your inbox and complete the account setup process to access your employee login portal."
         frappe.db.commit()
 
         return send_response(
@@ -439,7 +439,7 @@ def upload_employee_document(id=None):
                 status="fail",
                 message="Employee 'id' is required.",
                 status_code=400,
-                http_status=400,    
+                http_status=400,
             )
 
         if not document_name:
