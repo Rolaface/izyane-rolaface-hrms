@@ -245,7 +245,7 @@ def get_users():
 def get_employee_grades():
     try:
         data = _fetch_paginated_autosuggest(
-            "Employee Grade", frappe._dict({}), ["name", "employee_grade_name"]
+            "Employee Grade", frappe._dict({}), ["name"]
         )
         return send_response_list("success", "Employee Grades fetched successfully.", data)
     except Exception as e:
