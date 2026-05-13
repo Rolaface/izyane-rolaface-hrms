@@ -51,6 +51,10 @@ def get_payroll_employee(page=1, page_size=20):
                         "default_currency",
                     )
                 ),
+                "department": frappe.request.args.get("department"),
+                "branch": frappe.request.args.get("branch"),
+                "designation": frappe.request.args.get("designation"),
+                "grade": frappe.request.args.get("grade"),
                 "salary_slip_based_on_timesheet": frappe.utils.cint(
                     frappe.request.args.get(
                         "salary_slip_based_on_timesheet",

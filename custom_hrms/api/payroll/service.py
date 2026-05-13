@@ -35,7 +35,7 @@ def get_payroll_employee(filters, page=1, page_size=20):
     data = [
         {
             "value": emp[0],
-            "label": emp[0],
+            "label": emp[1],
             "description": emp[1] if len(emp) > 1 else emp[0],
         }
         for emp in paginated_employees
