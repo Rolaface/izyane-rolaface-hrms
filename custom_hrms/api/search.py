@@ -251,7 +251,25 @@ def get_employee_grades():
     except Exception as e:
         frappe.log_error(frappe.get_traceback(), "Get Employee Grades API Error")
         return send_response("fail", str(e), None, 500, 500)
-    
+
+@frappe.whitelist(allow_guest=False, methods=["GET"])
+def get_claim_types():
+    try:
+        data = _fetch_paginated_autosuggest(
+            doctype="Expense Claim Type",
+            filters=frappe._dict({}),
+            search_fields=["name", "expense_type"],
+            field_map={
+                "value": "name",
+                "label": "expense_type",
+                "description": "expense_type",
+            },
+        )
+        return send_response_list("success", "Claim Types fetched successfully.", data)
+    except Exception as e:
+        frappe.log_error(frappe.get_traceback(), "Get Claim Types API Error")
+        return send_response("fail", str(e), None, 500, 500)
+
 @frappe.whitelist(allow_guest=False, methods=["GET"])
 def get_employees():
     try:
