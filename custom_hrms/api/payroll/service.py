@@ -6,30 +6,30 @@ from hrms.payroll.doctype.payroll_entry.payroll_entry import (
     create_salary_slips_for_employees,
     submit_salary_slips_for_employees,
 )
+import frappe
+
+from hrms.payroll.doctype.payroll_entry.payroll_entry import (
+    employee_query,
+)
 
 
 def get_payroll_employee(filters):
-    doc = frappe.new_doc("Payroll Entry")
-
-    doc.company = filters.get("company")
-    doc.start_date = filters.get("start_date")
-    doc.end_date = filters.get("end_date")
-    doc.payroll_frequency = filters.get("payroll_frequency")
-    doc.payroll_payable_account = filters.get("payroll_payable_account")
-    doc.currency = filters.get("currency")
-    doc.salary_slip_based_on_timesheet = filters.get(
-        "salary_slip_based_on_timesheet", 0
+    employees = employee_query(
+        txt="",
+        doctype="Employee",
+        searchfield="name",
+        start=0,
+        page_len=999999,
+        filters=filters,
     )
-
-    doc.fill_employee_details()
 
     return [
         {
-            "value": emp.employee,
-            "label": emp.employee_name,
-            "description": (emp.department or emp.designation or emp.employee),
+            "value": emp[0],
+            "label": emp[0],
+            "description": emp[1] if len(emp) > 1 else emp[0],
         }
-        for emp in doc.employees
+        for emp in employees
     ]
 
 

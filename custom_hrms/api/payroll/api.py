@@ -20,18 +20,39 @@ def validate_payroll(payroll_entry_id):
 @frappe.whitelist(allow_guest=False, methods=["GET"])
 def get_payroll_employee():
     try:
+        company = frappe.request.args.get(
+            "company"
+        ) or frappe.defaults.get_user_default("Company")
+
         filters = frappe._dict(
             {
-                "company": frappe.request.args.get("company"),
+                "company": company,
                 "start_date": frappe.request.args.get("start_date"),
                 "end_date": frappe.request.args.get("end_date"),
-                "payroll_frequency": frappe.request.args.get("payroll_frequency"),
-                "payroll_payable_account": frappe.request.args.get(
-                    "payroll_payable_account"
+                "payroll_frequency": (
+                    frappe.request.args.get("payroll_frequency") or "Monthly"
                 ),
-                "currency": frappe.request.args.get("currency"),
+                "payroll_payable_account": (
+                    frappe.request.args.get("payroll_payable_account")
+                    or frappe.db.get_value(
+                        "Company",
+                        company,
+                        "default_payroll_payable_account",
+                    )
+                ),
+                "currency": (
+                    frappe.request.args.get("currency")
+                    or frappe.db.get_value(
+                        "Company",
+                        company,
+                        "default_currency",
+                    )
+                ),
                 "salary_slip_based_on_timesheet": frappe.utils.cint(
-                    frappe.request.args.get("salary_slip_based_on_timesheet", 0)
+                    frappe.request.args.get(
+                        "salary_slip_based_on_timesheet",
+                        0,
+                    )
                 ),
             }
         )
