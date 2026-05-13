@@ -1,5 +1,5 @@
 import frappe
-from custom_hrms.utils.response import send_response
+from custom_hrms.utils.response import send_response, send_response_list
 from . import service
 
 
@@ -18,8 +18,11 @@ def validate_payroll(payroll_entry_id):
 
 
 @frappe.whitelist(allow_guest=False, methods=["GET"])
-def get_payroll_employee():
+def get_payroll_employee(page=1, page_size=20):
     try:
+        page = int(page)
+        page_size = int(page_size)
+
         company = frappe.request.args.get(
             "company"
         ) or frappe.defaults.get_user_default("Company")
@@ -57,13 +60,35 @@ def get_payroll_employee():
             }
         )
 
-        data = service.get_payroll_employee(filters)
+        (
+            employees,
+            total_employees,
+            total_pages,
+        ) = service.get_payroll_employee(
+            filters=filters,
+            page=page,
+            page_size=page_size,
+        )
 
-        return send_response(
+        response_data = {
+            "success": True,
+            "message": "Payroll employees retrieved successfully",
+            "data": employees,
+            "pagination": {
+                "page": page,
+                "page_size": page_size,
+                "total": total_employees,
+                "total_pages": total_pages,
+                "has_next": page < total_pages,
+                "has_prev": page > 1,
+            },
+        }
+
+        return send_response_list(
             status="success",
-            message="Payroll employees fetched successfully.",
-            data=data,
+            message="Success",
             status_code=200,
+            data=response_data,
             http_status=200,
         )
 
@@ -75,8 +100,7 @@ def get_payroll_employee():
 
         return send_response(
             status="error",
-            message="Failed to fetch payroll employees.",
-            data={"error": str(e)},
+            message=f"Internal Server Error: {str(e)}",
             status_code=500,
             http_status=500,
         )

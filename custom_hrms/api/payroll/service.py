@@ -6,14 +6,15 @@ from hrms.payroll.doctype.payroll_entry.payroll_entry import (
     create_salary_slips_for_employees,
     submit_salary_slips_for_employees,
 )
-import frappe
+
+import math
 
 from hrms.payroll.doctype.payroll_entry.payroll_entry import (
     employee_query,
 )
 
 
-def get_payroll_employee(filters):
+def get_payroll_employee(filters, page=1, page_size=20):
     employees = employee_query(
         txt="",
         doctype="Employee",
@@ -23,14 +24,24 @@ def get_payroll_employee(filters):
         filters=filters,
     )
 
-    return [
+    total_employees = len(employees)
+    total_pages = math.ceil(total_employees / page_size)
+
+    start = (page - 1) * page_size
+    end = start + page_size
+
+    paginated_employees = employees[start:end]
+
+    data = [
         {
             "value": emp[0],
             "label": emp[0],
             "description": emp[1] if len(emp) > 1 else emp[0],
         }
-        for emp in employees
+        for emp in paginated_employees
     ]
+
+    return data, total_employees, total_pages
 
 
 @frappe.whitelist()
