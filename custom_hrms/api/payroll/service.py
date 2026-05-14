@@ -1,20 +1,21 @@
 import json
 import frappe
 from frappe import _
+import math
 
 from hrms.payroll.doctype.payroll_entry.payroll_entry import (
     create_salary_slips_for_employees,
     submit_salary_slips_for_employees,
-)
-
-import math
-
-from hrms.payroll.doctype.payroll_entry.payroll_entry import (
     employee_query,
 )
 
-
-def get_payroll_employee(filters, page=1, page_size=20):
+def get_payroll_employee(
+    filters,
+    page=1,
+    page_size=20,
+    sort_by="label",
+    sort_order="asc",
+):
     employees = employee_query(
         txt="",
         doctype="Employee",
@@ -24,24 +25,44 @@ def get_payroll_employee(filters, page=1, page_size=20):
         filters=filters,
     )
 
-    total_employees = len(employees)
+    data = [
+        {
+            "value": emp[0],
+            "label": emp[1],
+            "description": (emp[1] if len(emp) > 1 else emp[0]),
+        }
+        for emp in employees
+    ]
+
+    allowed_sort_fields = {
+        "value",
+        "label",
+        "description",
+    }
+
+    sort_by = sort_by if sort_by in allowed_sort_fields else "label"
+
+    reverse = str(sort_order).lower() == "desc"
+
+    data.sort(
+        key=lambda x: (x.get(sort_by) or "").lower(),
+        reverse=reverse,
+    )
+
+    total_employees = len(data)
+
     total_pages = math.ceil(total_employees / page_size)
 
     start = (page - 1) * page_size
     end = start + page_size
 
-    paginated_employees = employees[start:end]
+    paginated_employees = data[start:end]
 
-    data = [
-        {
-            "value": emp[0],
-            "label": emp[1],
-            "description": emp[1] if len(emp) > 1 else emp[0],
-        }
-        for emp in paginated_employees
-    ]
-
-    return data, total_employees, total_pages
+    return (
+        paginated_employees,
+        total_employees,
+        total_pages,
+    )
 
 
 @frappe.whitelist()

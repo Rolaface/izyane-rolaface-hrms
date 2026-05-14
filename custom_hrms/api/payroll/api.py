@@ -27,6 +27,16 @@ def get_payroll_employee(page=1, page_size=20):
             "company"
         ) or frappe.defaults.get_user_default("Company")
 
+        sort_by = frappe.request.args.get(
+            "sort_by",
+            "label",
+        )
+
+        sort_order = frappe.request.args.get(
+            "sort_order",
+            "asc",
+        )
+
         filters = frappe._dict(
             {
                 "company": company,
@@ -72,11 +82,13 @@ def get_payroll_employee(page=1, page_size=20):
             filters=filters,
             page=page,
             page_size=page_size,
+            sort_by=sort_by,
+            sort_order=sort_order,
         )
 
         response_data = {
             "success": True,
-            "message": "Payroll employees retrieved successfully",
+            "message": ("Payroll employees retrieved successfully"),
             "data": employees,
             "pagination": {
                 "page": page,
