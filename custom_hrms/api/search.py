@@ -213,6 +213,24 @@ def get_departments():
         return send_response("fail", str(e), None, 500, 500)
 
 @frappe.whitelist(allow_guest=False, methods=["GET"])
+def get_branches():
+    try:
+        data = _fetch_paginated_autosuggest(
+            doctype="Branch",
+            filters=frappe._dict({}),
+            search_fields=["name", "branch"],
+            field_map={
+                "value": "name",
+                "label": "branch",
+                "description": "branch",
+            },
+        )
+        return send_response_list("success", "Branches fetched successfully.", data)
+    except Exception as e:
+        frappe.log_error(frappe.get_traceback(), "Get Branches API Error")
+        return send_response("fail", str(e), None, 500, 500)
+
+@frappe.whitelist(allow_guest=False, methods=["GET"])
 def get_employment_types():
     try:
         data = _fetch_paginated_autosuggest(
