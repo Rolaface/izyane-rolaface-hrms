@@ -59,3 +59,57 @@ def get_leave_approvers(page=1, page_size=20):
             status_code=500,
             http_status=500,
         )
+
+@frappe.whitelist(allow_guest=False, methods=["GET"])
+def custom_employee_details(employee_id=None):
+    # Fallback to query params if not explicitly passed as an argument
+    if not employee_id:
+        employee_id = frappe.request.args.get("employee_id")
+
+    if not employee_id:
+        return send_response(
+            status="error",
+            message="Missing required parameter: employee_id",
+            data=None,
+            status_code=400,
+            http_status=400,
+        )
+
+    try:
+        # Call the service layer to get the compiled data
+        data = service.get_employee_details_data(employee_id)
+
+        # Handle the case where the employee does not exist
+        if not data:
+            return send_response(
+                status="error",
+                message=f"Employee with ID {employee_id} not found.",
+                data=None,
+                status_code=404,
+                http_status=404,
+            )
+
+        # Return successful response
+        return send_response(
+            status="success",
+            message="Employee details retrieved successfully.",
+            data=data,
+            status_code=200,
+            http_status=200,
+        )
+
+    except Exception as e:
+        # Log the traceback in Frappe's Error Log
+        frappe.log_error(
+            frappe.get_traceback(), 
+            f"Employee Details API Error - {employee_id}"
+        )
+        
+        # Return generic server error response
+        return send_response(
+            status="error",
+            message=f"Internal Server Error: {str(e)}",
+            data=None,
+            status_code=500,
+            http_status=500,
+        )
