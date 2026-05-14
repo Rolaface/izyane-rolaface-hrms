@@ -151,12 +151,23 @@ def get_employee_by_id(employee_id):
         "Employee", employee_id, RETURN_EMPLOYEE_FIELDS_GET_BY_ID, as_dict=True
     )
 
-    employee_data["salary_structure"] = frappe.db.get_value(
+    salary_assignment = frappe.db.get_value(
         "Salary Structure Assignment",
         {"employee": employee_id, "docstatus": 1},
-        "salary_structure",
+        ["salary_structure", "income_tax_slab", "base"],
+        as_dict=True,
         order_by="from_date desc",
     )
+
+    if salary_assignment:
+        employee_data["salary_structure"] = salary_assignment.get("salary_structure")
+        employee_data["income_tax_slab"] = salary_assignment.get("income_tax_slab")
+        employee_data["base_salary"] = salary_assignment.get("base")
+    else:
+        employee_data["salary_structure"] = None
+        employee_data["income_tax_slab"] = None
+        employee_data["base_salary"] = 0
+
     employee_data["leave_policy"] = frappe.db.get_value(
         "Leave Policy Assignment",
         {"employee": employee_id, "docstatus": 1},
