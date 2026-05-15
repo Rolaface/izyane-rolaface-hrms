@@ -84,24 +84,22 @@ def get_expense_claim_types(
     accounts_map = {}
 
     for acc in accounts:
-        accounts_map.setdefault(acc.parent, []).append(
-            {
-                "company": acc.company,
-                "default_account": acc.default_account,
-            }
-        )
+        accounts_map[acc.parent] = {
+            "account_company": acc.company,
+            "default_account": acc.default_account,
+        }
 
     result = []
 
     for row in expense_claim_types:
+        account_data = accounts_map.get(row.name, {})
+
         result.append(
             {
                 "name": row.name,
                 "expense_type": row.expense_type,
                 "creation": row.creation,
-                "modified": row.modified,
-                "owner": row.owner,
-                "accounts": accounts_map.get(row.name, []),
+                "account": account_data.get("default_account"),
             }
         )
 
@@ -195,43 +193,59 @@ def get_expense_claims(
             ],
         )
 
-    expenses_map = {}
+    expense_map = {}
 
     for exp in expenses:
-        expenses_map.setdefault(exp.parent, []).append(
-            {
-                "name": exp.name,
-                "expense_date": exp.expense_date,
-                "expense_type": exp.expense_type,
-                "default_account": exp.default_account,
-                "description": exp.description,
-                "amount": exp.amount,
-                "sanctioned_amount": exp.sanctioned_amount,
-            }
+        expense_map[exp.parent] = {
+            "expense_row_id": exp.name,
+            "expense_date": exp.expense_date,
+            "expense_type": exp.expense_type,
+            "default_account": exp.default_account,
+            "description": exp.description,
+            "amount": exp.amount,
+            "sanctioned_amount": exp.sanctioned_amount,
+        }
+
+    approver_names = {}
+
+    approver_ids = list(
+        {row.expense_approver for row in expense_claims if row.expense_approver}
+    )
+
+    if approver_ids:
+        users = frappe.get_all(
+            "User",
+            filters={
+                "name": ["in", approver_ids],
+            },
+            fields=[
+                "name",
+                "full_name",
+            ],
         )
+
+    for user in users:
+        approver_names[user.name] = user.full_name
 
     result = []
 
     for row in expense_claims:
+        expense_data = expense_map.get(row.name, {})
+
         result.append(
             {
                 "name": row.name,
                 "employee": row.employee,
                 "employee_name": row.employee_name,
                 "expense_approver": row.expense_approver,
-                "company": row.company,
+                "expense_approver_name": approver_names.get(row.expense_approver),
                 "posting_date": row.posting_date,
                 "approval_status": row.approval_status,
                 "docstatus": row.docstatus,
                 "currency": row.currency,
                 "total_claimed_amount": row.total_claimed_amount,
-                "total_sanctioned_amount": row.total_sanctioned_amount,
                 "clearance_date": row.clearance_date,
-                "remark": row.remark,
-                "creation": row.creation,
-                "modified": row.modified,
-                "owner": row.owner,
-                "expenses": expenses_map.get(row.name, []),
+                "expense_type": expense_data.get("expense_type"),
             }
         )
 
