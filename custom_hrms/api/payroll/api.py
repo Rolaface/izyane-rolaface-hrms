@@ -26,8 +26,9 @@ def validate_payroll(payroll_entry_id):
 
     if not payroll_period:
         return (
-            f"No Payroll Period is set for {doc.company} covering the dates "
-            f"from {doc.start_date} to {doc.end_date}."
+            f"No Payroll Period is configured for the selected payroll dates "
+            f"({doc.payroll_start_date} to {doc.payroll_end_date}). "
+            f"Please create or update a Payroll Period covering this range."
         )
 
     return None
