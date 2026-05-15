@@ -14,6 +14,22 @@ def validate_payroll(payroll_entry_id):
             "Payment Account is required on the Payroll Entry to generate a Bank Entry."
         )
 
+    payroll_period = frappe.db.get_value(
+        "Payroll Period",
+        {
+            "company": doc.company,
+            "start_date": ("<=", doc.start_date),
+            "end_date": (">=", doc.end_date),
+        },
+        "name",
+    )
+
+    if not payroll_period:
+        return (
+            f"No Payroll Period is set for {doc.company} covering the dates "
+            f"from {doc.start_date} to {doc.end_date}."
+        )
+
     return None
 
 
