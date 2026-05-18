@@ -15,10 +15,10 @@ VALID_WEEKDAYS = {
     "Sunday",
 }
 
-
 def create_holiday_list_service(payload: dict) -> dict:
     validate_payload(payload)
 
+    # 1. Initialize in memory
     holiday_list = frappe.get_doc(
         {
             "doctype": "Holiday List",
@@ -29,19 +29,16 @@ def create_holiday_list_service(payload: dict) -> dict:
         }
     )
 
-    holiday_list.insert(ignore_permissions=True)
-
     rebuild_holidays(
         holiday_list=holiday_list,
         payload=payload,
     )
 
-    holiday_list.save(ignore_permissions=True)
+    holiday_list.insert(ignore_permissions=True)
 
     frappe.db.commit()
 
     return serialize_holiday_list(holiday_list)
-
 
 def get_holiday_list_service(name: str) -> dict:
     holiday_list = frappe.get_doc(
@@ -214,17 +211,10 @@ def add_weekly_offs(
             holiday_list.append(
                 "holidays",
                 {
-                    "holiday_date": current_date,
+                    "holiday_date": str(current_date),  # <-- Cast to string!
                     "description": weekly_off.get("weekday"),
                     "weekly_off": 1,
-                    "is_half_day": (
-                        1
-                        if weekly_off.get(
-                            "is_half_day",
-                            False,
-                        )
-                        else 0
-                    ),
+                    "is_half_day": (1 if weekly_off.get("is_half_day", False) else 0),
                 },
             )
 

@@ -212,6 +212,8 @@ def get_expense_claims(
         {row.expense_approver for row in expense_claims if row.expense_approver}
     )
 
+    users = []
+
     if approver_ids:
         users = frappe.get_all(
             "User",
