@@ -141,6 +141,24 @@ def get_designations():
         return send_response("fail", str(e), None, 500, 500)
 
 @frappe.whitelist(allow_guest=False, methods=["GET"])
+def get_shift_types():
+    try:
+        data = _fetch_paginated_autosuggest(
+            doctype="Shift Type",
+            filters=frappe._dict({}),
+            search_fields=["name"],
+            field_map={
+                "value": "name",
+                "label": "name",
+                "description": "name",
+            },
+        )
+        return send_response_list("success", "Shift Types fetched successfully.", data)
+    except Exception as e:
+        frappe.log_error(frappe.get_traceback(), "Get Shift Types API Error")
+        return send_response("fail", str(e), None, 500, 500)
+
+@frappe.whitelist(allow_guest=False, methods=["GET"])
 def get_salary_structures():
     try:
         data = _fetch_paginated_autosuggest(
