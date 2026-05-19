@@ -119,11 +119,15 @@ def list_holiday_lists():
             http_status=500,
         )
 
-
 @frappe.whitelist(allow_guest=False, methods=["PUT", "PATCH"])
-def update_holiday_list(name: str):
+def update_holiday_list():
     try:
         payload = frappe.request.get_json()
+
+        name = frappe.request.args.get("name")
+
+        if not name:
+            frappe.throw("Holiday List name is required")
 
         holiday_list = update_holiday_list_service(
             name=name,

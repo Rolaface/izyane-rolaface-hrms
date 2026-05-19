@@ -18,7 +18,6 @@ VALID_WEEKDAYS = {
 def create_holiday_list_service(payload: dict) -> dict:
     validate_payload(payload)
 
-    # 1. Initialize in memory
     holiday_list = frappe.get_doc(
         {
             "doctype": "Holiday List",
@@ -48,21 +47,28 @@ def get_holiday_list_service(name: str) -> dict:
 
     return serialize_holiday_list(holiday_list)
 
-
 def list_holiday_lists_service() -> list:
     holiday_lists = frappe.get_all(
         "Holiday List",
-        fields=[
-            "name",
-            "holiday_list_name",
-            "from_date",
-            "to_date",
-            "country",
-        ],
+        pluck="name",
         order_by="modified desc",
     )
 
-    return holiday_lists
+    result = []
+
+    for name in holiday_lists:
+        holiday_list = frappe.get_doc(
+            "Holiday List",
+            name,
+        )
+
+        result.append(
+            serialize_holiday_list_summary(
+                holiday_list,
+            )
+        )
+
+    return result
 
 
 def update_holiday_list_service(
@@ -279,6 +285,59 @@ def add_custom_holidays(
 #     }
 
 
+def serialize_holiday_list_summary(
+    holiday_list,
+) -> dict:
+    total_days = (
+        getdate(holiday_list.to_date) -
+        getdate(holiday_list.from_date)
+    ).days + 1
+
+    total_holidays = len(holiday_list.holidays)
+
+    total_half_holidays = sum(
+        1
+        for holiday in holiday_list.holidays
+        if holiday.is_half_day
+    )
+
+    total_full_holidays = (
+        total_holidays -
+        total_half_holidays
+    )
+
+    total_half_working_days = total_half_holidays
+
+    total_full_working_days = (
+        total_days -
+        total_full_holidays -
+        total_half_holidays
+    )
+
+    total_working_days = (
+        total_full_working_days +
+        (total_half_working_days * 0.5)
+    )
+
+    return {
+        "name": holiday_list.name,
+        "holiday_list_name": holiday_list.holiday_list_name,
+        "from_date": holiday_list.from_date,
+        "to_date": holiday_list.to_date,
+
+        "total_days": total_days,
+
+        "total_holidays": total_holidays,
+
+        "total_full_holidays": total_full_holidays,
+        "total_half_holidays": total_half_holidays,
+
+        "total_full_working_days": total_full_working_days,
+        "total_half_working_days": total_half_working_days,
+
+        "total_working_days": total_working_days,
+    }
+
 def serialize_holiday_list(
     holiday_list,
 ) -> dict:
@@ -316,11 +375,55 @@ def serialize_holiday_list(
 
             holidays.append(holiday_data)
 
+    total_days = (
+        getdate(holiday_list.to_date) -
+        getdate(holiday_list.from_date)
+    ).days + 1
+
+    total_holidays = len(holiday_list.holidays)
+
+    total_half_holidays = sum(
+        1
+        for holiday in holiday_list.holidays
+        if holiday.is_half_day
+    )
+
+    total_full_holidays = (
+        total_holidays -
+        total_half_holidays
+    )
+
+    total_full_working_days = (
+        total_days -
+        total_full_holidays -
+        total_half_holidays
+    )
+
+    total_half_working_days = total_half_holidays
+
+    total_working_days = (
+        total_full_working_days +
+        (total_half_working_days * 0.5)
+    )
+
     return {
         "name": holiday_list.name,
         "holiday_list_name": holiday_list.holiday_list_name,
         "from_date": holiday_list.from_date,
         "to_date": holiday_list.to_date,
+
+        "total_days": total_days,
+
+        "total_holidays": total_holidays,
+
+        "total_full_holidays": total_full_holidays,
+        "total_half_holidays": total_half_holidays,
+
+        "total_full_working_days": total_full_working_days,
+        "total_half_working_days": total_half_working_days,
+
+        "total_working_days": total_working_days,
+
         "weekly_offs": weekly_offs,
         "holidays": holidays,
     }
