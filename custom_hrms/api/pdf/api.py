@@ -8,9 +8,11 @@ def get_document_pdf(
     doctype: str,
     name: str,
     print_format: str | None = None,
+    orientation: str = "Portrait",
 ):
     return generate_document_pdf(
         doctype=doctype,
         name=name,
         print_format=print_format,
+        orientation=orientation,
     )

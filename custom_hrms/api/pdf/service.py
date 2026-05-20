@@ -9,9 +9,15 @@ def generate_document_pdf(
     doctype: str,
     name: str,
     print_format: str | None = None,
+    orientation: str = "Portrait",
 ):
     if not frappe.has_permission(doctype, "read", doc=name):
         frappe.throw("Not permitted")
+
+    orientation = orientation.capitalize()
+
+    if orientation not in ["Portrait", "Landscape"]:
+        frappe.throw("Orientation must be Portrait or Landscape")
 
     resolved_print_format = resolve_print_format(
         doctype=doctype,
@@ -25,7 +31,12 @@ def generate_document_pdf(
         no_letterhead=1,
     )
 
-    pdf = get_pdf(html)
+    pdf = get_pdf(
+        html,
+        options={
+            "orientation": orientation,
+        },
+    )
 
     frappe.local.response.filename = f"{name}.pdf"
     frappe.local.response.filecontent = pdf
