@@ -1,5 +1,5 @@
 import frappe
-from frappe.utils import today
+from frappe.utils import flt, today
 from frappe.utils.file_manager import save_file
 import os
 
@@ -63,9 +63,7 @@ def create_employee(data):
             )
 
         if data.get("leave_policy"):
-            assign_leave_policy(
-                employee.name, data.get("leave_policy"), employee.get("date_of_joining")
-            )
+            assign_leave_policy(employee.name, data.get("leave_policy"))
 
         if employee.get("holiday_list"):
             assign_holiday_list(
@@ -83,7 +81,6 @@ def create_employee(data):
 
 def update_employee(employee_id, data):
     employee = frappe.get_doc("Employee", employee_id)
-
     for field in ALLOWED_EMPLOYEE_FIELDS:
         if field in data and data.get(field) is not None:
             employee.set(field, data.get(field))
@@ -100,35 +97,52 @@ def update_employee(employee_id, data):
 
     employee.save(ignore_permissions=True)
 
-    if data.get("salary_structure"):
-        current_salary = frappe.db.get_value(
+    if any(k in data for k in ["salary_structure", "base_salary", "income_tax_slab"]):
+        current_assignment = frappe.db.get_value(
             "Salary Structure Assignment",
             {"employee": employee_id, "docstatus": 1},
-            "salary_structure",
+            ["salary_structure", "base", "income_tax_slab"],
+            as_dict=True,
+            order_by="from_date desc, creation desc",
         )
 
-        if current_salary != data.get("salary_structure"):
-            assign_salary_structure(
-                employee=employee.name,
-                salary_structure=data.get("salary_structure"),
-                company=employee.company,
-                from_date=data.get("effective_date") or today(),
-                base_salary=data.get("base_salary", 0),
-                income_tax_slab=data.get("income_tax_slab"),
-            )
+        if current_assignment:
+            new_structure = data.get("salary_structure", current_assignment.get("salary_structure"))
+            new_base = data.get("base_salary", current_assignment.get("base"))
+            new_slab = data.get("income_tax_slab", current_assignment.get("income_tax_slab"))
+
+            if (new_structure != current_assignment.get("salary_structure") or 
+                flt(new_base) != flt(current_assignment.get("base")) or 
+                new_slab != current_assignment.get("income_tax_slab")):
+                
+                assign_salary_structure(
+                    employee=employee.name,
+                    salary_structure=new_structure,
+                    company=employee.company,
+                    from_date=data.get("effective_date") or today(),
+                    base_salary=new_base,
+                    income_tax_slab=new_slab,
+                )
+        else:
+            if data.get("salary_structure"):
+                assign_salary_structure(
+                    employee=employee.name,
+                    salary_structure=data.get("salary_structure"),
+                    company=employee.company,
+                    from_date=data.get("effective_date") or today(),
+                    base_salary=data.get("base_salary", 0),
+                    income_tax_slab=data.get("income_tax_slab"),
+                )
 
     if data.get("leave_policy"):
         current_leave = frappe.db.get_value(
             "Leave Policy Assignment",
             {"employee": employee_id, "docstatus": 1},
             "leave_policy",
+            order_by="effective_from desc, creation desc"
         )
         if current_leave != data.get("leave_policy"):
-            assign_leave_policy(
-                employee.name,
-                data.get("leave_policy"),
-                data.get("effective_date") or today(),
-            )
+            assign_leave_policy(employee.name, data.get("leave_policy"))
 
     if data.get("holiday_list"):
         current_holiday = frappe.db.get_value(
@@ -156,7 +170,7 @@ def get_employee_by_id(employee_id):
         {"employee": employee_id, "docstatus": 1},
         ["salary_structure", "income_tax_slab", "base"],
         as_dict=True,
-        order_by="from_date desc",
+        order_by="from_date desc, creation desc", # Ensure we get the latest assignment if multiple exist should be from date but because of the way we are assigning it can be multiple with same from date so using creation date to get the latest one
     )
 
     if salary_assignment:
