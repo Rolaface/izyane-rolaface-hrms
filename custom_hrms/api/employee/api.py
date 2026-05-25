@@ -19,7 +19,7 @@ def create_employee():
         return send_response(
             status="success",
             message="Employee created successfully.",
-            data={"employee": employee_data.employee, "messages": messages},
+            data={"employee": employee_data.employee_name, "employee_id": employee_data.employee, "messages": messages},
             status_code=201,
             http_status=201,
         )
