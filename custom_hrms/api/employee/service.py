@@ -202,6 +202,15 @@ def get_employee_by_id(employee_id):
         for field in ALLOWED_EXTENDED_FIELDS:
             employee_data[field] = None
 
+    if employee_data.get("leave_approver"):
+        employee_data["leave_approver_name"] = frappe.db.get_value(
+            "User",
+            employee_data.get("leave_approver"),
+            "full_name"
+        )
+    else:
+        employee_data["leave_approver_name"] = None
+
     return employee_data
 
 
