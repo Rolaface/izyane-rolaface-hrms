@@ -2,6 +2,7 @@ import frappe
 from custom_hrms.utils.response import send_response, send_response_list
 from frappe.desk.search import build_for_autosuggest, search_widget
 
+
 def _get_pagination_args():
     try:
         page = int(frappe.request.args.get("page", 1))
@@ -9,6 +10,7 @@ def _get_pagination_args():
     except ValueError:
         page, page_size = 1, 10
     return page, page_size
+
 
 def _fetch_paginated_autosuggest(
     doctype,
@@ -79,7 +81,7 @@ def _fetch_paginated_autosuggest(
     else:
         total_items = frappe.db.count(doctype, filters=filters)
 
-    total_pages = ((total_items + page_size - 1) // page_size if page_size else 1)
+    total_pages = (total_items + page_size - 1) // page_size if page_size else 1
 
     return {
         "data": response_data,
@@ -93,7 +95,8 @@ def _fetch_paginated_autosuggest(
             "has_previous": page > 1,
         },
     }
-    
+
+
 # @frappe.whitelist(allow_guest=False, methods=["GET"])
 # def get_items():
 #     try:
@@ -121,7 +124,8 @@ def _fetch_paginated_autosuggest(
 #     except Exception as e:
 #         frappe.log_error(frappe.get_traceback(), "Get Item Codes API Error")
 #         return send_response("fail", str(e), None, 500, 500)
-    
+
+
 @frappe.whitelist(allow_guest=False, methods=["GET"])
 def get_designations():
     try:
@@ -139,6 +143,7 @@ def get_designations():
     except Exception as e:
         frappe.log_error(frappe.get_traceback(), "Get Designations API Error")
         return send_response("fail", str(e), None, 500, 500)
+
 
 @frappe.whitelist(allow_guest=False, methods=["GET"])
 def get_shift_types():
@@ -158,6 +163,7 @@ def get_shift_types():
         frappe.log_error(frappe.get_traceback(), "Get Shift Types API Error")
         return send_response("fail", str(e), None, 500, 500)
 
+
 @frappe.whitelist(allow_guest=False, methods=["GET"])
 def get_salary_structures():
     try:
@@ -171,10 +177,13 @@ def get_salary_structures():
                 "description": "name",
             },
         )
-        return send_response_list("success", "Salary Structures fetched successfully.", data)
+        return send_response_list(
+            "success", "Salary Structures fetched successfully.", data
+        )
     except Exception as e:
         frappe.log_error(frappe.get_traceback(), "Get Salary Structures API Error")
         return send_response("fail", str(e), None, 500, 500)
+
 
 @frappe.whitelist(allow_guest=False, methods=["GET"])
 def get_leave_policies():
@@ -189,10 +198,13 @@ def get_leave_policies():
                 "description": "name",
             },
         )
-        return send_response_list("success", "Leave Policies fetched successfully.", data)
+        return send_response_list(
+            "success", "Leave Policies fetched successfully.", data
+        )
     except Exception as e:
         frappe.log_error(frappe.get_traceback(), "Get Leave Policies API Error")
         return send_response("fail", str(e), None, 500, 500)
+
 
 @frappe.whitelist(allow_guest=False, methods=["GET"])
 def get_leave_types():
@@ -211,7 +223,8 @@ def get_leave_types():
     except Exception as e:
         frappe.log_error(frappe.get_traceback(), "Get Leave Types API Error")
         return send_response("fail", str(e), None, 500, 500)
-    
+
+
 @frappe.whitelist(allow_guest=False, methods=["GET"])
 def get_departments():
     try:
@@ -229,6 +242,7 @@ def get_departments():
     except Exception as e:
         frappe.log_error(frappe.get_traceback(), "Get Departments API Error")
         return send_response("fail", str(e), None, 500, 500)
+
 
 @frappe.whitelist(allow_guest=False, methods=["GET"])
 def get_branches():
@@ -248,16 +262,20 @@ def get_branches():
         frappe.log_error(frappe.get_traceback(), "Get Branches API Error")
         return send_response("fail", str(e), None, 500, 500)
 
+
 @frappe.whitelist(allow_guest=False, methods=["GET"])
 def get_employment_types():
     try:
         data = _fetch_paginated_autosuggest(
             "Employment Type", frappe._dict({}), ["name", "employment_type_name"]
         )
-        return send_response_list("success", "Employment Types fetched successfully.", data)
+        return send_response_list(
+            "success", "Employment Types fetched successfully.", data
+        )
     except Exception as e:
         frappe.log_error(frappe.get_traceback(), "Get Employment Types API Error")
         return send_response("fail", str(e), None, 500, 500)
+
 
 @frappe.whitelist(allow_guest=False, methods=["GET"])
 def get_users():
@@ -276,17 +294,21 @@ def get_users():
     except Exception as e:
         frappe.log_error(frappe.get_traceback(), "Get Users API Error")
         return send_response("fail", str(e), None, 500, 500)
-    
+
+
 @frappe.whitelist(allow_guest=False, methods=["GET"])
 def get_employee_grades():
     try:
         data = _fetch_paginated_autosuggest(
             "Employee Grade", frappe._dict({}), ["name"]
         )
-        return send_response_list("success", "Employee Grades fetched successfully.", data)
+        return send_response_list(
+            "success", "Employee Grades fetched successfully.", data
+        )
     except Exception as e:
         frappe.log_error(frappe.get_traceback(), "Get Employee Grades API Error")
         return send_response("fail", str(e), None, 500, 500)
+
 
 @frappe.whitelist(allow_guest=False, methods=["GET"])
 def get_claim_types():
@@ -306,23 +328,108 @@ def get_claim_types():
         frappe.log_error(frappe.get_traceback(), "Get Claim Types API Error")
         return send_response("fail", str(e), None, 500, 500)
 
+
+# @frappe.whitelist(allow_guest=False, methods=["GET"])
+# def get_employees():
+#     try:
+#         data = _fetch_paginated_autosuggest(
+#             doctype="Employee",
+#             filters=frappe._dict({}),
+#             search_fields=["name", "employee_name"],
+#             field_map={
+#                 "value": "name",
+#                 "label": "employee_name",
+#                 "description": "name",
+#             },
+#         )
+
+#         return send_response_list("success","Employees fetched successfully.",data,)
+
+#     except Exception as e:
+#         frappe.log_error(frappe.get_traceback(),"Get Employees API Error")
+#         return send_response("fail",str(e),None,500,500)
+
+
 @frappe.whitelist(allow_guest=False, methods=["GET"])
 def get_employees():
     try:
-        data = _fetch_paginated_autosuggest(
-            doctype="Employee",
-            filters=frappe._dict({}),
-            search_fields=["name", "employee_name"],
-            field_map={
-                "value": "name",
-                "label": "employee_name",
-                "description": "name",
+        current_employee = frappe.request.args.get("current_employee")
+
+        search = frappe.request.args.get(
+            "search",
+            "",
+        ).strip()
+
+        employees = frappe.get_all(
+            "Employee",
+            filters={
+                "status": "Active",
+            },
+            or_filters=(
+                [
+                    [
+                        "name",
+                        "like",
+                        f"%{search}%",
+                    ],
+                    [
+                        "employee_name",
+                        "like",
+                        f"%{search}%",
+                    ],
+                    [
+                        "company_email",
+                        "like",
+                        f"%{search}%",
+                    ],
+                ]
+                if search
+                else []
+            ),
+            fields=[
+                "name",
+                "employee_name",
+                "company_email",
+            ],
+            order_by="employee_name asc",
+            limit_page_length=10,
+        )
+
+        data = []
+
+        for emp in employees:
+            if current_employee and emp.name == current_employee:
+                continue
+
+            data.append(
+                {
+                    "value": emp.name,
+                    "label": (emp.employee_name or emp.name),
+                    "description": emp.name,
+                }
+            )
+
+        return send_response_list(
+            "success",
+            "Employees fetched successfully.",
+            {
+                "data": data,
+                "pagination": {
+                    "items_in_page": len(data),
+                },
             },
         )
 
-        return send_response_list("success","Employees fetched successfully.",data,)
-
     except Exception as e:
-        frappe.log_error(frappe.get_traceback(),"Get Employees API Error")
-        return send_response("fail",str(e),None,500,500)
-    
+        frappe.log_error(
+            frappe.get_traceback(),
+            "Get Employees API Error",
+        )
+
+        return send_response(
+            "fail",
+            str(e),
+            None,
+            500,
+            500,
+        )
