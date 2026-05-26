@@ -64,7 +64,6 @@ def get_payroll_employee(
         total_pages,
     )
 
-
 @frappe.whitelist()
 def run_payroll(payroll_entry: str) -> dict:
     try:
@@ -199,3 +198,154 @@ def get_error_response(message: str, traceback: str | None = None) -> dict:
         response["traceback"] = traceback
 
     return response
+
+def calculate_payroll_entry_payable(payroll_entry_id):
+    doc = frappe.get_doc("Payroll Entry", payroll_entry_id)
+    
+    existing_slips = frappe.get_all(
+        "Salary Slip",
+        filters={
+            "payroll_entry": payroll_entry_id,
+            "docstatus": ["<", 2]
+        },
+        fields=["name", "net_pay", "rounded_total"]
+    )
+
+    if existing_slips:
+        total_payable = sum(
+            slip.get("rounded_total") or slip.get("net_pay") or 0.0 
+            for slip in existing_slips
+        )
+        return {
+            "payroll_entry": payroll_entry_id,
+            "currency": doc.currency,
+            "total_payable": total_payable,
+            "employee_count": len(existing_slips),
+            "calculation_method": "From Existing Salary Slips"
+        }
+
+    if not doc.get("employees"):
+        try:
+            doc.fill_employee_details()
+        except Exception as e:
+            return {
+                "payroll_entry": payroll_entry_id,
+                "total_payable": 0.0,
+                "employee_count": 0,
+                "last_error": f"Failed to fetch employees: {str(e)}"
+            }
+
+    if not doc.get("employees"):
+        return {
+            "payroll_entry": payroll_entry_id,
+            "currency": doc.currency,
+            "total_payable": 0.0,
+            "employee_count": 0,
+            "last_error": "No eligible, active employees found for this period."
+        }
+
+    total_payable = 0.0
+    processed_count = 0
+    last_error = None
+
+    for emp in doc.employees:
+        try:
+            slip = frappe.new_doc("Salary Slip")
+            slip.employee = emp.employee
+            slip.start_date = doc.start_date
+            slip.end_date = doc.end_date
+            slip.company = doc.company
+            slip.payroll_frequency = doc.payroll_frequency
+            
+            slip.payroll_entry = doc.name 
+            slip.posting_date = doc.posting_date or frappe.utils.today()
+            slip.salary_slip_based_on_timesheet = doc.get("salary_slip_based_on_timesheet", 0)
+            
+            if doc.currency: slip.currency = doc.currency
+            if doc.exchange_rate: slip.exchange_rate = doc.exchange_rate
+            
+            slip.get_emp_and_working_day_details()
+            
+            slip.process_salary_structure()
+            slip.calculate_net_pay()
+            
+            payable = slip.rounded_total or slip.net_pay or 0.0
+            
+            total_payable += payable
+            
+            if payable > 0:
+                processed_count += 1
+            else:
+                print(f"Employee {emp.employee} returned 0.0. Payment Days: {slip.payment_days}, LWP: {slip.leave_without_pay}")
+                
+        except Exception as e:
+            last_error = f"Error calculating for {emp.employee}: {str(e)}"
+            print(last_error)
+
+    return {
+        "payroll_entry": payroll_entry_id,
+        "currency": doc.currency,
+        "total_payable": total_payable,
+        "employee_count": processed_count,
+        "calculation_method": "On-the-fly Dynamic Calculation",
+        "last_error": last_error
+    }
+
+def get_payroll_entry_list(filters, page=1, page_size=20):
+    start = (page - 1) * page_size
+    
+    fields = [
+        "name",
+        "company",
+        "start_date",
+        "end_date",
+        "payroll_frequency",
+        "status",
+        "currency"
+    ]
+
+    entries = frappe.get_all(
+        "Payroll Entry",
+        filters=filters,
+        fields=fields,
+        order_by="creation desc",
+        limit_start=start,
+        limit_page_length=page_size
+    )
+
+    for entry in entries:
+        try:
+            summary = calculate_payroll_entry_payable(entry.name)
+            entry["total_payable"] = summary.get("total_payable", 0.0)
+            entry["employee_count"] = summary.get("employee_count", 0)
+            
+            if summary.get("last_error"):
+                entry["last_error"] = summary.get("last_error")
+                
+        except Exception as e:
+            entry["total_payable"] = 0.0
+            entry["employee_count"] = 0
+            entry["last_error"] = f"Fatal Loop Error: {str(e)}"
+
+    total_count = frappe.db.count("Payroll Entry", filters=filters)
+    total_pages = math.ceil(total_count / page_size) if page_size else 1
+
+    return entries, total_count, total_pages
+
+def get_payroll_entry_details(payroll_entry_id):
+    doc = frappe.get_doc("Payroll Entry", payroll_entry_id)
+    doc_dict = doc.as_dict()
+    
+    keys_to_remove = ["_user_tags", "_comments", "_assign", "_liked_by"]
+    for key in keys_to_remove:
+        doc_dict.pop(key, None)
+
+    financial_summary = calculate_payroll_entry_payable(payroll_entry_id)
+
+    doc_dict["financial_summary"] = {
+        "total_payable": financial_summary.get("total_payable"),
+        "employee_count": financial_summary.get("employee_count"),
+        "calculation_method": financial_summary.get("calculation_method")
+    }
+
+    return doc_dict

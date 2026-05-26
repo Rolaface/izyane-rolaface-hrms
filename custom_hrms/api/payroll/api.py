@@ -1,6 +1,7 @@
 import frappe
 from custom_hrms.utils.response import send_response, send_response_list
 from . import service
+from frappe.utils import cint
 
 
 def validate_payroll(payroll_entry_id):
@@ -215,6 +216,97 @@ def run_payroll(id=None):
             status="error",
             message="Failed to run payroll.",
             data={"error": str(e)},
+            status_code=500,
+            http_status=500,
+        )
+
+@frappe.whitelist(allow_guest=False, methods=["GET"])
+def get_payroll_entries():
+    try:
+        page = cint(frappe.request.args.get("page", 1))
+        page_size = cint(frappe.request.args.get("page_size", 20))
+        company = frappe.request.args.get("company") or frappe.defaults.get_user_default("Company")
+
+        filters = {}
+        if company:
+            filters["company"] = company
+            
+        status = frappe.request.args.get("status")
+        if status:
+            filters["status"] = status
+
+        data, total_count, total_pages = service.get_payroll_entry_list(
+            filters=filters, 
+            page=page, 
+            page_size=page_size
+        )
+
+        response_data = {
+            "success": True,
+            "data": data,
+            "pagination": {
+                "page": page,
+                "page_size": page_size,
+                "total": total_count,
+                "total_pages": total_pages,
+                "has_next": page < total_pages,
+                "has_prev": page > 1,
+            }
+        }
+
+        return send_response_list(
+            status="success",
+            message="Payroll entries retrieved successfully.",
+            status_code=200,
+            data=response_data,
+            http_status=200,
+        )
+
+    except Exception as e:
+        frappe.log_error(frappe.get_traceback(), "Custom Get Payroll Entries API Error")
+        return send_response(
+            status="error",
+            message=f"Internal Server Error: {str(e)}",
+            status_code=500,
+            http_status=500,
+        )
+
+@frappe.whitelist(allow_guest=False, methods=["GET"])
+def get_payroll_entry(id=None):
+    try:
+        payroll_entry_id = id or frappe.request.args.get("id")
+
+        if not payroll_entry_id:
+            return send_response(
+                status="fail",
+                message="'id' is required.",
+                status_code=400,
+                http_status=400,
+            )
+
+        if not frappe.db.exists("Payroll Entry", payroll_entry_id):
+            return send_response(
+                status="fail",
+                message="Payroll Entry not found.",
+                status_code=404,
+                http_status=404,
+            )
+
+        result = service.get_payroll_entry_details(payroll_entry_id)
+
+        return send_response(
+            status="success",
+            message="Payroll entry details retrieved successfully.",
+            data=result,
+            status_code=200,
+            http_status=200,
+        )
+
+    except Exception as e:
+        frappe.log_error(frappe.get_traceback(), "Custom Get Payroll Entry Details API Error")
+        return send_response(
+            status="error",
+            message=f"Internal Server Error: {str(e)}",
             status_code=500,
             http_status=500,
         )
