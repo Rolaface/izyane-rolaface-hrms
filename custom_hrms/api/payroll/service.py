@@ -291,7 +291,7 @@ def calculate_payroll_entry_payable(payroll_entry_id):
         "last_error": last_error
     }
 
-def get_payroll_entry_list(filters, page=1, page_size=20):
+def get_payroll_entry_list(filters, page=1, page_size=20, search="", sort_by="creation", sort_order="desc"):
     start = (page - 1) * page_size
     
     fields = [
@@ -304,11 +304,23 @@ def get_payroll_entry_list(filters, page=1, page_size=20):
         "currency"
     ]
 
+    or_filters = []
+    if search:
+        or_filters.append(["name", "like", f"%{search}%"])
+
+    allowed_sort_fields = ["name", "creation", "start_date", "end_date", "status", "company", "payroll_frequency"]
+    if sort_by not in allowed_sort_fields:
+        sort_by = "creation"
+    
+    sort_order = "desc" if sort_order.lower() == "desc" else "asc"
+    order_by_string = f"{sort_by} {sort_order}"
+
     entries = frappe.get_all(
         "Payroll Entry",
         filters=filters,
+        or_filters=or_filters,
         fields=fields,
-        order_by="creation desc",
+        order_by=order_by_string,
         limit_start=start,
         limit_page_length=page_size
     )
@@ -327,7 +339,7 @@ def get_payroll_entry_list(filters, page=1, page_size=20):
             entry["employee_count"] = 0
             entry["last_error"] = f"Fatal Loop Error: {str(e)}"
 
-    total_count = frappe.db.count("Payroll Entry", filters=filters)
+    total_count = len(frappe.get_all("Payroll Entry", filters=filters, or_filters=or_filters, pluck="name"))
     total_pages = math.ceil(total_count / page_size) if page_size else 1
 
     return entries, total_count, total_pages

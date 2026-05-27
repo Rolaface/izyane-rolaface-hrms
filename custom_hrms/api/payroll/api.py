@@ -227,6 +227,11 @@ def get_payroll_entries():
         page_size = cint(frappe.request.args.get("page_size", 20))
         company = frappe.request.args.get("company") or frappe.defaults.get_user_default("Company")
 
+        # New search and sort parameters
+        search = frappe.request.args.get("search", "")
+        sort_by = frappe.request.args.get("sort_by", "creation")
+        sort_order = frappe.request.args.get("sort_order", "desc")
+
         filters = {}
         if company:
             filters["company"] = company
@@ -238,7 +243,10 @@ def get_payroll_entries():
         data, total_count, total_pages = service.get_payroll_entry_list(
             filters=filters, 
             page=page, 
-            page_size=page_size
+            page_size=page_size,
+            search=search,
+            sort_by=sort_by,
+            sort_order=sort_order
         )
 
         response_data = {
