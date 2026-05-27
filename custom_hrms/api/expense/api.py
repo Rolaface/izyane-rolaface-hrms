@@ -140,3 +140,98 @@ def get_expense_claims():
             status_code=500,
             http_status=500,
         )
+
+@frappe.whitelist(allow_guest=False, methods=["PUT"])
+def update_expense_claim_status(claim_id: str, status: str):
+
+    VALID_STATUSES = {"Draft", "Submitted", "Approved", "Rejected", "Cancelled"}
+
+    if status not in VALID_STATUSES:
+        return send_response(
+            status="fail",
+            message=f"Invalid status '{status}'. Allowed: {', '.join(VALID_STATUSES)}",
+            data=None,
+            status_code=400,
+            http_status=400
+        )
+
+    if not frappe.db.exists("Expense Claim", claim_id):
+        return send_response(
+            status="fail",
+            message=f"Expense Claim '{claim_id}' not found.",
+            data=None,
+            status_code=404,
+            http_status=404
+        )
+
+    doc = frappe.get_doc("Expense Claim", claim_id)
+    current_status = doc.status
+    current_docstatus = doc.docstatus
+
+    VALID_TRANSITIONS = {
+        "Draft":     ["Submitted", "Cancelled"],
+        "Submitted": ["Approved", "Rejected", "Cancelled"],
+        "Approved":  ["Cancelled"],
+        "Rejected":  ["Cancelled"],
+        "Cancelled": [],
+    }
+
+    if status not in VALID_TRANSITIONS.get(current_status, []):
+        return send_response(
+            status="fail",
+            message=f"Cannot transition from '{current_status}' to '{status}'.",
+            data=None,
+            status_code=400,
+            http_status=400
+        )
+
+    try:
+        if status == "Submitted" and current_docstatus == 0:
+            doc.submit()
+
+        elif status == "Approved" and current_docstatus == 1:
+            doc.approval_status = "Approved"
+            doc.status = "Approved"
+            doc.approved_by = frappe.session.user
+            doc.save(ignore_permissions=True)
+            doc.submit()
+
+        elif status == "Rejected" and current_docstatus == 1:
+            doc.approval_status = "Rejected"
+            doc.status = "Rejected"
+            doc.approved_by = frappe.session.user
+            doc.save(ignore_permissions=True)
+            doc.submit()
+
+        elif status == "Cancelled":
+            if current_docstatus == 1:
+                doc.cancel()
+            else:
+                # Draft — just delete or mark cancelled directly
+                doc.status = "Cancelled"
+                doc.save(ignore_permissions=True)
+            doc.submit()
+
+        return send_response(
+            status="success",
+            message=f"Expense Claim status updated from '{current_status}' to '{status}'.",
+            data={
+                "id":             doc.name,
+                "previous_status": current_status,
+                "current_status":  status,
+                "updated_by":      frappe.session.user,
+            },
+            status_code=200,
+            http_status=200
+        )
+
+    except Exception as e:
+        frappe.db.rollback()
+        frappe.log_error(frappe.get_traceback(), "Update Expense Claim Status Error")
+        return send_response(
+            status="fail",
+            message=str(e),
+            data=None,
+            status_code=500,
+            http_status=500
+        )
