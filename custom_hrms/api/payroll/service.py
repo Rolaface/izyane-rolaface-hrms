@@ -209,13 +209,22 @@ def calculate_payroll_entry_payable(payroll_entry_id):
     existing_slips = frappe.get_all("Salary Slip", filters={"payroll_entry": payroll_entry_id}, pluck="name")
 
     if existing_slips:
-        total_payable = 0.0
+        total_gross_payable = 0.0
+        total_net_payable = 0.0
+        total_deduction = 0.0
         breakdown = []
         
         for slip_name in existing_slips:
             slip_doc = frappe.get_doc("Salary Slip", slip_name)
-            payable = slip_doc.rounded_total or slip_doc.net_pay or 0.0
-            total_payable += payable
+            
+            # Use rounded_total for net if available, otherwise exact net_pay
+            net_payable = slip_doc.rounded_total or slip_doc.net_pay or 0.0
+            gross = slip_doc.gross_pay or 0.0
+            deduction = slip_doc.total_deduction or 0.0
+            
+            total_gross_payable += gross
+            total_net_payable += net_payable
+            total_deduction += deduction
             
             raw_slip = slip_doc.as_dict()
             slip_dict = extract_allowed_fields(raw_slip, SALARY_SLIP_FIELDS)
@@ -228,24 +237,41 @@ def calculate_payroll_entry_payable(payroll_entry_id):
             else: slip_status = "Draft"
 
             slip_dict["status"] = slip_status
-            slip_dict["payable_amount"] = payable
+            slip_dict["net_payable"] = net_payable
             breakdown.append(slip_dict)
             
         return {
-            "payroll_entry": payroll_entry_id, "currency": doc.currency, "total_payable": total_payable,
-            "employee_count": len(existing_slips), "calculation_method": "From Existing Salary Slips",
+            "payroll_entry": payroll_entry_id, 
+            "currency": doc.currency, 
+            "total_gross_payable": total_gross_payable,
+            "total_net_payable": total_net_payable,
+            "total_deduction": total_deduction,
+            "employee_count": len(existing_slips), 
+            "calculation_method": "From Existing Salary Slips",
             "employee_breakdown": breakdown
         }
 
     if not doc.get("employees"):
         try: doc.fill_employee_details()
         except Exception as e:
-            return {"payroll_entry": payroll_entry_id, "total_payable": 0.0, "employee_count": 0, "employee_breakdown": [], "last_error": f"Failed to fetch employees: {str(e)}"}
+            return {
+                "payroll_entry": payroll_entry_id, 
+                "total_gross_payable": 0.0, "total_net_payable": 0.0, "total_deduction": 0.0,
+                "employee_count": 0, "employee_breakdown": [], 
+                "last_error": f"Failed to fetch employees: {str(e)}"
+            }
 
     if not doc.get("employees"):
-        return {"payroll_entry": payroll_entry_id, "currency": doc.currency, "total_payable": 0.0, "employee_count": 0, "employee_breakdown": [], "last_error": "No eligible employees found."}
+        return {
+            "payroll_entry": payroll_entry_id, "currency": doc.currency, 
+            "total_gross_payable": 0.0, "total_net_payable": 0.0, "total_deduction": 0.0,
+            "employee_count": 0, "employee_breakdown": [], 
+            "last_error": "No eligible employees found."
+        }
 
-    total_payable = 0.0
+    total_gross_payable = 0.0
+    total_net_payable = 0.0
+    total_deduction = 0.0
     processed_count = 0
     last_error = None
     breakdown = []
@@ -269,9 +295,15 @@ def calculate_payroll_entry_payable(payroll_entry_id):
             slip.process_salary_structure()
             slip.calculate_net_pay()
             
-            payable = slip.rounded_total or slip.net_pay or 0.0
-            total_payable += payable
-            if payable > 0: processed_count += 1
+            net_payable = slip.rounded_total or slip.net_pay or 0.0
+            gross = slip.gross_pay or 0.0
+            deduction = slip.total_deduction or 0.0
+            
+            total_gross_payable += gross
+            total_net_payable += net_payable
+            total_deduction += deduction
+            
+            if net_payable > 0: processed_count += 1
                 
             raw_slip = slip.as_dict()
             slip_dict = extract_allowed_fields(raw_slip, SALARY_SLIP_FIELDS)
@@ -279,17 +311,23 @@ def calculate_payroll_entry_payable(payroll_entry_id):
             slip_dict["deductions"] = [extract_allowed_fields(d, SALARY_DETAIL_FIELDS) for d in raw_slip.get("deductions", [])]
             
             slip_dict["status"] = "Preview"
-            slip_dict["payable_amount"] = payable
+            slip_dict["net_payable"] = net_payable
             breakdown.append(slip_dict)
                 
         except Exception as e:
             last_error = f"Error calculating for {emp.employee}: {str(e)}"
-            breakdown.append({"employee": emp.employee, "employee_name": emp.employee_name, "status": "Error", "error_message": str(e), "payable_amount": 0.0})
+            breakdown.append({"employee": emp.employee, "employee_name": emp.employee_name, "status": "Error", "error_message": str(e), "net_payable": 0.0})
 
     return {
-        "payroll_entry": payroll_entry_id, "currency": doc.currency, "total_payable": total_payable,
-        "employee_count": processed_count, "calculation_method": "On-the-fly Dynamic Calculation",
-        "employee_breakdown": breakdown, "last_error": last_error
+        "payroll_entry": payroll_entry_id, 
+        "currency": doc.currency, 
+        "total_gross_payable": total_gross_payable,
+        "total_net_payable": total_net_payable,
+        "total_deduction": total_deduction,
+        "employee_count": processed_count, 
+        "calculation_method": "On-the-fly Dynamic Calculation",
+        "employee_breakdown": breakdown, 
+        "last_error": last_error
     }
 
 
@@ -311,11 +349,16 @@ def get_payroll_entry_list(filters, page=1, page_size=20, search="", sort_by="cr
     for entry in entries:
         try:
             summary = calculate_payroll_entry_payable(entry.name)
-            entry["total_payable"] = summary.get("total_payable", 0.0)
+            entry["total_gross_payable"] = summary.get("total_gross_payable", 0.0)
+            entry["total_net_payable"] = summary.get("total_net_payable", 0.0)
+            entry["total_deduction"] = summary.get("total_deduction", 0.0)
             entry["employee_count"] = summary.get("employee_count", 0)
+            
             if summary.get("last_error"): entry["last_error"] = summary.get("last_error")
         except Exception as e:
-            entry["total_payable"] = 0.0
+            entry["total_gross_payable"] = 0.0
+            entry["total_net_payable"] = 0.0
+            entry["total_deduction"] = 0.0
             entry["employee_count"] = 0
             entry["last_error"] = f"Fatal Loop Error: {str(e)}"
 
@@ -333,7 +376,9 @@ def get_payroll_entry_details(payroll_entry_id):
     financial_summary = calculate_payroll_entry_payable(payroll_entry_id)
 
     doc_dict["financial_summary"] = {
-        "total_payable": financial_summary.get("total_payable"),
+        "total_gross_payable": financial_summary.get("total_gross_payable"),
+        "total_net_payable": financial_summary.get("total_net_payable"),
+        "total_deduction": financial_summary.get("total_deduction"),
         "employee_count": financial_summary.get("employee_count"),
         "calculation_method": financial_summary.get("calculation_method")
     }
