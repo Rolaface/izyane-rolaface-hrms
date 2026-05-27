@@ -135,6 +135,9 @@ def get_expense_claims(
 
     if search:
         filters["name"] = ["like", f"%{search}%"]
+        filters["employee_name"] = ["like", f"%{search}%"]
+        filters["expense_approver"] = ["like", f"%{search}%"]
+        filters["employee"] = ["like", f"%{search}%"]
 
     total = frappe.db.count(
         "Expense Claim",
