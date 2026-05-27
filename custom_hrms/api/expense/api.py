@@ -168,35 +168,16 @@ def update_expense_claim_status(claim_id: str, status: str):
     current_status = doc.status
     current_docstatus = doc.docstatus
 
-    VALID_TRANSITIONS = {
-        "Draft":     ["Submitted", "Cancelled"],
-        "Submitted": ["Approved", "Rejected", "Cancelled"],
-        "Approved":  ["Cancelled"],
-        "Rejected":  ["Cancelled"],
-        "Cancelled": [],
-    }
-
-    if status not in VALID_TRANSITIONS.get(current_status, []):
-        return send_response(
-            status="fail",
-            message=f"Cannot transition from '{current_status}' to '{status}'.",
-            data=None,
-            status_code=400,
-            http_status=400
-        )
-
     try:
-        if status == "Submitted" and current_docstatus == 0:
-            doc.submit()
 
-        elif status == "Approved" and current_docstatus == 1:
+        if status == "Approved" and current_docstatus == 0:
             doc.approval_status = "Approved"
             doc.status = "Approved"
             doc.approved_by = frappe.session.user
             doc.save(ignore_permissions=True)
             doc.submit()
 
-        elif status == "Rejected" and current_docstatus == 1:
+        elif status == "Rejected" and current_docstatus == 0:
             doc.approval_status = "Rejected"
             doc.status = "Rejected"
             doc.approved_by = frappe.session.user
