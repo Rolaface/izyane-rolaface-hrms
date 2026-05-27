@@ -1,6 +1,6 @@
 import math
 import frappe
-from frappe.utils import flt, nowdate
+from frappe.utils import flt, nowdate, getdate, add_months, get_first_day, get_last_day, nowdate
 
 from hrms.hr.doctype.department_approver.department_approver import (
     get_approvers,
@@ -93,58 +93,3 @@ def get_employee_details_data(employee_id):
         }
     }
 
-def get_employee_status_counts():
-    company = frappe.defaults.get_user_default("Company") or frappe.get_default("Company")
-    today = nowdate()
-
-    total_active = frappe.db.count(
-        "Employee", 
-        filters={
-            "status": "Active", 
-            "company": company
-        }
-    )
-
-    total_inactive = frappe.db.count(
-        "Employee", 
-        filters={
-            "status": ["!=", "Active"], 
-            "company": company
-        }
-    )
-
-    leaves_today = frappe.get_all(
-        "Leave Application",
-        filters={
-            "docstatus": 1,
-            "status": "Approved",
-            "company": company,
-            "from_date": ["<=", today],
-            "to_date": [">=", today]
-        },
-        fields=["employee"]
-    )
-    
-    on_leave_employees = set([leave.employee for leave in leaves_today])
-    on_leave_count = len(on_leave_employees)
-
-    active_working = max(0, total_active - on_leave_count)
-
-    total_leaves = frappe.db.count(
-        "Leave Application",
-        filters={
-            "company": company,
-            "docstatus": ["<", 2]  
-        }
-    )
-
-    total_leave_types = frappe.db.count("Leave Type")
-
-    return {
-        "total_active": total_active,
-        "active_working": active_working,
-        "on_leave": on_leave_count,
-        "inactive": total_inactive,
-        "total_leaves": total_leaves,
-        "total_leave_types": total_leave_types
-    }

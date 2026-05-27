@@ -111,33 +111,3 @@ def custom_employee_details(employee_id=None):
             status_code=500,
             http_status=500,
         )
-
-@frappe.whitelist(allow_guest=False, methods=["GET"])
-def get_employee_status_counts():
-    try:
-        counts_data = service.get_employee_status_counts()
-
-        response = send_response(
-            status="success",
-            message="Employee status counts retrieved successfully",
-            status_code=200,
-            data=counts_data,
-            http_status=200,
-        )
-        
-        frappe.response.update(response)
-
-    except Exception as e:
-        frappe.log_error(
-            frappe.get_traceback(),
-            "Get Employee Status Counts API Error",
-        )
-
-        error_response = send_response(
-            status="error",
-            message=f"Internal Server Error: {str(e)}",
-            status_code=500,
-            http_status=500,
-        )
-        
-        frappe.response.update(error_response)
