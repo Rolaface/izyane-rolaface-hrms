@@ -216,3 +216,56 @@ def update_expense_claim_status(claim_id: str, status: str):
             status_code=500,
             http_status=500
         )
+
+@frappe.whitelist(allow_guest=True, methods=["GET"])
+def get_by_id():
+    claim_id = frappe.request.args.get("id")
+
+    if not claim_id:
+        return send_response(
+            status="fail",
+            message="Expense Claim ID is required.",
+            data=None,
+            status_code=400,
+            http_status=400
+        )
+
+    try:
+        expense_claim = frappe.get_doc("Expense Claim", claim_id).as_dict()
+        attachments = frappe.db.get_all(
+                                        "File",
+                                        filters={
+                                            "attached_to_doctype": "Expense Claim",
+                                            "attached_to_name": expense_claim.name,
+                                        },
+                                        fields=[
+                                            "name",
+                                            "file_name",
+                                            "file_url",
+                                            "file_size",
+                                            "file_type",
+                                            "is_private",
+                                            "creation",
+                                        ],
+                                        order_by="creation desc",
+                                    )
+        expense_claim["attachments"] = attachments
+
+        return send_response(
+            status="success",
+            message="Expense Claim retrieved successfully.",
+            data=expense_claim
+        )
+    except Exception as e:
+        frappe.log_error(
+            frappe.get_traceback(),
+            "Get Expense Claim By ID API Error",
+        )
+
+        return send_response(
+            status="error",
+            message=str(e),
+            data=None,
+            status_code=500,
+            http_status=500,
+        )
