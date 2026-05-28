@@ -82,6 +82,29 @@ ALLOWED_EMPLOYEE_FIELDS = {
     "holiday_list",
 }
 
+ALLOWED_SORT_FIELDS = {
+    "name",
+    "creation",
+    "modified",
+    "employee_name",
+    "employee_number",
+    "department",
+    "designation",
+    "company",
+    "branch",
+    "status",
+    "employment_type",
+    "date_of_joining",
+    "date_of_birth",
+    "date_of_retirement",
+    "relieving_date",
+    "scheduled_confirmation_date",
+    "final_confirmation_date",
+    "grade",
+    "reports_to",
+    "gender",
+}
+
 RETURN_EMPLOYEE_FIELDS_GET_ALL = [
     "name",
     "employee_name",

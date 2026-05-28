@@ -1,4 +1,5 @@
 import frappe
+from frappe import _
 from frappe.utils import flt, today
 from frappe.utils.file_manager import save_file
 import os
@@ -11,6 +12,7 @@ from .utils import (
     ALLOWED_EXTENDED_FIELDS,
     RETURN_EMPLOYEE_FIELDS_GET_ALL,
     RETURN_EMPLOYEE_FIELDS_GET_BY_ID,
+    ALLOWED_SORT_FIELDS,
     build_advanced_filters,
 )
 
@@ -168,7 +170,7 @@ def get_employee_by_id(employee_id):
     salary_assignment = frappe.db.get_value(
         "Salary Structure Assignment",
         {"employee": employee_id, "docstatus": 1},
-        ["salary_structure", "income_tax_slab", "base"],
+        ["salary_structure", "income_tax_slab", "base", "from_date"],
         as_dict=True,
         order_by="from_date desc, creation desc", # Ensure we get the latest assignment if multiple exist should be from date but because of the way we are assigning it can be multiple with same from date so using creation date to get the latest one
     )
@@ -177,10 +179,12 @@ def get_employee_by_id(employee_id):
         employee_data["salary_structure"] = salary_assignment.get("salary_structure")
         employee_data["income_tax_slab"] = salary_assignment.get("income_tax_slab")
         employee_data["base_salary"] = salary_assignment.get("base")
+        employee_data["effective_date"] = salary_assignment.get("from_date")
     else:
         employee_data["salary_structure"] = None
         employee_data["income_tax_slab"] = None
         employee_data["base_salary"] = 0
+        employee_data["effective_date"] = None
 
     employee_data["leave_policy"] = frappe.db.get_value(
         "Leave Policy Assignment",
@@ -232,16 +236,15 @@ def get_employees(
 
     safe_filters = build_advanced_filters(filters)
 
-    if sort_by not in ALLOWED_EMPLOYEE_FIELDS and sort_by not in [
-        "name",
-        "creation",
-        "modified",
-    ]:
-        sort_by = "creation"
-    if sort_order.lower() not in ["asc", "desc"]:
-        sort_order = "desc"
+    if sort_by not in ALLOWED_SORT_FIELDS:
+        frappe.throw(_("Invalid sort_by field"))
 
-    order_by_string = f"{sort_by} {sort_order}"
+    sort_order = str(sort_order).lower()
+
+    if sort_order not in ["asc", "desc"]:
+        frappe.throw(_("Invalid sort_order value. Use 'asc' or 'desc'"))
+
+    order_by_string = f"`tabEmployee`.`{sort_by}` {sort_order}"
 
     employees = frappe.get_all(
         "Employee",
