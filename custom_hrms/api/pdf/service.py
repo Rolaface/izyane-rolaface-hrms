@@ -28,7 +28,8 @@ def generate_document_pdf(
         doctype=doctype,
         name=name,
         print_format=resolved_print_format,
-        no_letterhead=1,
+        no_letterhead=0,
+        pdf_generator="chrome"
     )
 
     pdf = get_pdf(
