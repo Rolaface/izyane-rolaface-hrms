@@ -259,3 +259,9 @@ fixtures = [
         ]
     }
 ]
+
+doc_events = {
+    "Expense Claim": {
+        "validate": "custom_hrms.api.expense.before_validate_hooks.before_validate"
+    }
+}
