@@ -207,7 +207,8 @@ def update_expense_claim_status(claim_id: str, status: str):
         )
 
     except Exception as e:
-        frappe.db.rollback()
+        if db := getattr(frappe.local, "db", None):
+            db.rollback(chain=True)
         frappe.log_error(frappe.get_traceback(), "Update Expense Claim Status Error")
         return send_response(
             status="fail",
