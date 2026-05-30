@@ -328,6 +328,24 @@ def get_claim_types():
         frappe.log_error(frappe.get_traceback(), "Get Claim Types API Error")
         return send_response("fail", str(e), None, 500, 500)
 
+@frappe.whitelist(allow_guest=False, methods=["GET"])
+def get_quotation_lost_reasons():
+    try:
+        data = _fetch_paginated_autosuggest(
+            doctype="Quotation Lost Reason",
+            filters=frappe._dict({}),
+            search_fields=["name", "order_lost_reason"],
+            field_map={
+                "value": "name",
+                "label": "order_lost_reason",
+                "description": "order_lost_reason",
+            },
+        )
+        return send_response_list("success", "Quotation Lost Reasons fetched successfully.", data)
+    except Exception as e:
+        frappe.log_error(frappe.get_traceback(), "Get Quotation Lost Reasons API Error")
+        return send_response("fail", str(e), None, 500, 500)
+
 
 # @frappe.whitelist(allow_guest=False, methods=["GET"])
 # def get_employees():
