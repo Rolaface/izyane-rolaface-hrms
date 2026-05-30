@@ -251,6 +251,10 @@ def get_by_id():
                                         order_by="creation desc",
                                     )
         expense_claim["attachments"] = attachments
+        if expense_claim.get("advances"):
+            for advance in expense_claim["advances"]:
+                advance_doc = frappe.get_doc("Employee Advance", advance.employee_advance)
+                advance["purpose"] = advance_doc.purpose
 
         return send_response(
             status="success",
