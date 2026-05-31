@@ -3,7 +3,7 @@ from frappe import _
 
 from .service import (
     validate_inputs,
-    has_salary_preview_permission,
+   
     get_salary_structure_assignment,
     build_preview_salary_slip,
     serialize,
@@ -23,7 +23,7 @@ def get_salary_breakdown():
         frappe.log_error(title="Salary Preview Error", message=frappe.get_traceback())
         return send_response(
             status="error",
-            message=_("An unexpected error occurred. Contact your administrator."),
+            message=_("Something went wrong ."),
             status_code=500,
             http_status=500,
         )
@@ -37,12 +37,7 @@ def _handle_request():
     if error:
         return send_response(status="fail", message=error, status_code=400, http_status=400)
 
-    if not has_salary_preview_permission(employee):
-        frappe.throw(
-            _("Not permitted to view salary details for this employee."),
-            frappe.PermissionError,
-        )
-
+   
     assignment = get_salary_structure_assignment(employee, effective_date)
     if not assignment:
         return send_response(

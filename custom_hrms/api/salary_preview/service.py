@@ -4,15 +4,15 @@ from frappe.utils import add_years, getdate, get_first_day, get_last_day, today
 
 
 
+
+
 # Validation
-
-
 def validate_inputs(employee: str, effective_date: str):
     if not employee:
-        return _("Query parameter 'employee' is required."), None
+        return _("employee' is required."), None
 
     if not effective_date:
-        return _("Query parameter 'effective_date' is required."), None
+        return _("effective_date is required."), None
 
     try:
         parsed = getdate(effective_date)
@@ -32,24 +32,6 @@ def validate_inputs(employee: str, effective_date: str):
         return _("Employee '{0}' does not exist.").format(employee), None
 
     return None, getdate(effective_date)
-
-
-
-# Permission
-
-
-def has_salary_preview_permission(employee: str) -> bool:
-    user = frappe.session.user
-
-    if not user or user == "Guest":
-        return False
-
-    allowed_roles = {"HR Manager", "Payroll Manager", "System Manager"}
-    if set(frappe.get_roles(user)) & allowed_roles:
-        return True
-
-    employee_user = frappe.db.get_value("Employee", employee, "user_id")
-    return bool(employee_user and employee_user == user)
 
 
 
@@ -160,9 +142,6 @@ def serialize(salary_slip, assignment, effective_date) -> dict:
     }
 
 
-# ---------------------------------------------------------------------------
-# Helpers
-# ---------------------------------------------------------------------------
 
 def _flt(value) -> float:
     return round(float(value or 0), 2)

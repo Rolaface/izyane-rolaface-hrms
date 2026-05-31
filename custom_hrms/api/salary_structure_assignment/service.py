@@ -2,16 +2,18 @@ import frappe
 from frappe.utils import getdate, today
 
 
-
-
-def _fetch_assignments(employee: str, company: str) -> list:
-    filters = {
-        "docstatus": 1,
-        "employee": employee,
-    }
+def _fetch_assignments(employee: str, company: str, from_date: str, to_date: str) -> list:
+    filters = [
+        ["docstatus", "=", 1],
+        ["employee", "=", employee],
+    ]
 
     if company:
-        filters["company"] = company
+        filters.append(["company", "=", company])
+    if from_date:
+        filters.append(["from_date", ">=", from_date])
+    if to_date:
+        filters.append(["from_date", "<=", to_date])
 
     return frappe.get_all(
         "Salary Structure Assignment",
@@ -32,12 +34,9 @@ def _fetch_assignments(employee: str, company: str) -> list:
     )
 
 
-
-
 def _assign_statuses(records: list) -> list:
     current_date = getdate(today())
 
-    # Find the active record — latest from_date that is on or before today
     effective_records = [
         r for r in records
         if r.get("from_date") and getdate(r["from_date"]) <= current_date
@@ -63,33 +62,20 @@ def _assign_statuses(records: list) -> list:
     return records
 
 
-
-
-def _apply_search(records: list, search: str) -> list:
-    if not search:
-        return records
-
-    return [
-        r for r in records
-        if search in (r.get("employee", "") or "").lower()
-        or search in (r.get("employee_name", "") or "").lower()
-        or search in (r.get("salary_structure", "") or "").lower()
-    ]
-
-
-
-
 _STATUS_PRIORITY = {"Active": 0, "Upcoming": 1, "Inactive": 2}
 
-def _sort_records(records: list) -> list:
-    return sorted(
-        records,
-        key=lambda r: (
-            _STATUS_PRIORITY.get(r["status"], 99),
-            -getdate(r["from_date"]).toordinal(),
-        ),
-    )
 
+def _sort_records(records: list) -> list:
+    def sort_key(record):
+        from_date = getdate(record["from_date"])
+        status    = record["status"]
+
+        if status == "Upcoming":
+            return (_STATUS_PRIORITY.get(status, 99), from_date.toordinal())
+
+        return (_STATUS_PRIORITY.get(status, 99), -from_date.toordinal())
+
+    return sorted(records, key=sort_key)
 
 
 def _paginate(records: list, page: int, page_size: int) -> dict:
@@ -112,11 +98,16 @@ def _paginate(records: list, page: int, page_size: int) -> dict:
     }
 
 
-
-def get_assignment_list(employee: str, company: str, search: str, page: int, page_size: int) -> dict:
-    records = _fetch_assignments(employee, company)
+def get_assignment_list(
+    employee:  str,
+    company:   str,
+    from_date: str,
+    to_date:   str,
+    page:      int,
+    page_size: int,
+) -> dict:
+    records = _fetch_assignments(employee, company, from_date, to_date)
     records = _assign_statuses(records)
-    records = _apply_search(records, search)
     records = _sort_records(records)
 
     return _paginate(records, page, page_size)

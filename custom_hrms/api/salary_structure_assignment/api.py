@@ -23,11 +23,12 @@ def get_salary_structure_assignment_list():
 
 
 def _handle_request():
-    employee   = frappe.request.args.get("employee")
-    company    = frappe.request.args.get("company")
-    search     = frappe.request.args.get("search", "").strip().lower()
-    page       = max(cint(frappe.request.args.get("page", 1)), 1)
-    page_size  = min(max(cint(frappe.request.args.get("page_size", 20)), 1), 100)
+    employee  = frappe.request.args.get("employee")
+    company   = frappe.request.args.get("company")
+    from_date = frappe.request.args.get("from_date")
+    to_date   = frappe.request.args.get("to_date")
+    page      = max(cint(frappe.request.args.get("page", 1)), 1)
+    page_size = min(max(cint(frappe.request.args.get("page_size", 20)), 1), 100)
 
     if not employee:
         return send_response(
@@ -40,7 +41,8 @@ def _handle_request():
     response_data = get_assignment_list(
         employee=employee,
         company=company,
-        search=search,
+        from_date=from_date,
+        to_date=to_date,
         page=page,
         page_size=page_size,
     )
