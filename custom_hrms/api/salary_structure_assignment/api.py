@@ -24,7 +24,7 @@ def get_salary_structure_assignment_list():
 
 def _handle_request():
     employee  = frappe.request.args.get("employee")
-    company   = frappe.request.args.get("company")
+    company   = frappe.request.args.get("company") or frappe.defaults.get_user_default("Company")
     from_date = frappe.request.args.get("from_date")
     to_date   = frappe.request.args.get("to_date")
     page      = max(cint(frappe.request.args.get("page", 1)), 1)

@@ -9,7 +9,7 @@ from frappe.utils import add_years, getdate, get_first_day, get_last_day, today
 # Validation
 def validate_inputs(employee: str, effective_date: str):
     if not employee:
-        return _("employee' is required."), None
+        return _("employee is required."), None
 
     if not effective_date:
         return _("effective_date is required."), None
@@ -17,21 +17,14 @@ def validate_inputs(employee: str, effective_date: str):
     try:
         parsed = getdate(effective_date)
     except Exception:
-        return _("'effective_date' must be a valid ISO date (YYYY-MM-DD). Got: {0}").format(
-            effective_date
-        ), None
-
-    lower = add_years(getdate(today()), -10)
-    upper = add_years(getdate(today()), 1)
-    if not (lower <= parsed <= upper):
         return _(
-            "effective_date {0} is out of the allowed range ({1} to {2})."
-        ).format(effective_date, lower, upper), None
+            "'effective_date' must be a valid ISO date (YYYY-MM-DD). Got: {0}"
+        ).format(effective_date), None
 
     if not frappe.db.exists("Employee", employee):
         return _("Employee '{0}' does not exist.").format(employee), None
 
-    return None, getdate(effective_date)
+    return None, parsed
 
 
 
