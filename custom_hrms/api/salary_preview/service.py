@@ -87,6 +87,7 @@ def build_preview_salary_slip(salary_structure: str, employee: str, posting_date
         "Salary Structure", salary_structure, "company"
     )
 
+    ss.flags.ignore_permissions = True
     ss.get_emp_and_working_day_details()
     ss.calculate_net_pay()
 
