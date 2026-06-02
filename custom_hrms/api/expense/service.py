@@ -171,6 +171,7 @@ def get_expense_claims(
             "creation",
             "modified",
             "owner",
+            "total_amount_reimbursed"
         ],
         order_by=f"{sort_by} {sort_order}",
         limit_start=start,
@@ -255,6 +256,7 @@ def get_expense_claims(
                 "total_claimed_amount": row.total_claimed_amount,
                 "clearance_date": row.clearance_date,
                 "expense_type": expense_data.get("expense_type"),
+                "total_amount_reimbursed": row.total_amount_reimbursed,
             }
         )
 
