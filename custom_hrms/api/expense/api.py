@@ -187,11 +187,11 @@ def update_expense_claim_status(claim_id: str, status: str):
         elif status == "Cancelled":
             if current_docstatus == 1:
                 doc.cancel()
+                # doc.submit()
             else:
                 # Draft — just delete or mark cancelled directly
-                doc.status = "Cancelled"
+                doc.approval_status = "Cancelled"
                 doc.save(ignore_permissions=True)
-            doc.submit()
 
         return send_response(
             status="success",

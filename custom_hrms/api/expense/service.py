@@ -239,6 +239,8 @@ def get_expense_claims(
 
     for row in expense_claims:
         expense_data = expense_map.get(row.name, {})
+        if row.docstatus == 2:
+            row.approval_status = "Cancelled"
 
         result.append(
             {
