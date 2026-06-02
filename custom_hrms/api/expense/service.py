@@ -239,9 +239,9 @@ def get_expense_claims(
 
     for row in expense_claims:
         expense_data = expense_map.get(row.name, {})
-        if row.docstatus == 2:
-            row.approval_status = "Cancelled"
-
+        if row.approval_status  == "Cancelled":
+            row.status = "Cancelled"
+        
         result.append(
             {
                 "name": row.name,
@@ -250,8 +250,7 @@ def get_expense_claims(
                 "expense_approver": row.expense_approver,
                 "expense_approver_name": approver_names.get(row.expense_approver),
                 "posting_date": row.posting_date,
-                "approval_status": row.approval_status,
-                "status": row.status,
+                "approval_status": row.status,
                 "currency": row.currency,
                 "total_claimed_amount": row.total_claimed_amount,
                 "clearance_date": row.clearance_date,
