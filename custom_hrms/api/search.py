@@ -373,81 +373,29 @@ def get_employees():
     try:
         current_employee = frappe.request.args.get("current_employee")
 
-        search = frappe.request.args.get(
-            "search",
-            "",
-        ).strip()
+        filters = frappe._dict({"status": "Active"})
 
-        employees = frappe.get_all(
-            "Employee",
-            filters={
-                "status": "Active",
-            },
-            or_filters=(
-                [
-                    [
-                        "name",
-                        "like",
-                        f"%{search}%",
-                    ],
-                    [
-                        "employee_name",
-                        "like",
-                        f"%{search}%",
-                    ],
-                    [
-                        "company_email",
-                        "like",
-                        f"%{search}%",
-                    ],
-                ]
-                if search
-                else []
-            ),
-            fields=[
-                "name",
-                "employee_name",
-                "company_email",
-            ],
-            order_by="employee_name asc",
-            limit_page_length=10,
-        )
-
-        data = []
-
-        for emp in employees:
-            if current_employee and emp.name == current_employee:
-                continue
-
-            data.append(
-                {
-                    "value": emp.name,
-                    "label": (emp.employee_name or emp.name),
-                    "description": emp.name,
-                }
-            )
-
-        return send_response_list(
-            "success",
-            "Employees fetched successfully.",
-            {
-                "data": data,
-                "pagination": {
-                    "items_in_page": len(data),
-                },
+        data = _fetch_paginated_autosuggest(
+            doctype="Employee",
+            filters=filters,
+            search_fields=["name", "employee_name", "company_email"],
+            field_map={
+                "value": "name",
+                "label": "employee_name",
+                "description": "name",
             },
         )
+
+        
+        if current_employee:
+            data["data"] = [
+                item for item in data["data"]
+                if item.get("value") != current_employee
+            ]
+            data["pagination"]["items_in_page"] = len(data["data"])
+
+        return send_response_list("success", "Employees fetched successfully.", data)
 
     except Exception as e:
-        frappe.log_error(
-            frappe.get_traceback(),
-            "Get Employees API Error",
-        )
-
-        return send_response(
-            "fail",
-            str(e),
-            None,
-            500,
-            500,
-        )
+        frappe.log_error(frappe.get_traceback(), "Get Employees API Error")
+        return send_response("fail", str(e), None, 500, 500)
