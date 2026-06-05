@@ -2,8 +2,8 @@ import frappe
 from frappe.utils import cint
 from custom_hrms.utils.response import send_response, send_response_list
 
-from .service import get_assignment_list
-
+from . import service
+import json
 
 @frappe.whitelist(allow_guest=False, methods=["GET"])
 def get_salary_structure_assignment_list():
@@ -38,7 +38,7 @@ def _handle_request():
             http_status=400,
         )
 
-    response_data = get_assignment_list(
+    response_data = service.get_assignment_list(
         employee=employee,
         company=company,
         from_date=from_date,
@@ -54,3 +54,47 @@ def _handle_request():
         data=response_data,
         http_status=200,
     )
+
+@frappe.whitelist(allow_guest=False, methods=["POST"])
+def sync_condition_and_formula():
+    try:
+        salary_component = frappe.request.args.get("salary_component")
+
+        if not salary_component:
+            return send_response(
+                status="fail",
+                message="salary_component is required.",
+                status_code=400,
+                http_status=400,
+            )
+
+        result = service.sync_condition_and_formula(
+            salary_component=salary_component
+        )
+
+        frappe.db.commit()
+
+        return send_response(
+            status="success",
+            message="Condition and formula synced successfully.",
+            data=result,
+            status_code=200,
+            http_status=200,
+        )
+
+    except Exception:
+        frappe.db.rollback()
+
+        traceback = frappe.get_traceback()
+
+        frappe.log_error(
+            message=traceback,
+            title="Sync Condition And Formula Error",
+        )
+
+        return send_response(
+            status="error",
+            message=traceback,
+            status_code=500,
+            http_status=500,
+        )
