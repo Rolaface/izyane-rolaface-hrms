@@ -111,3 +111,40 @@ def get_assignment_list(
     records = _sort_records(records)
 
     return _paginate(records, page, page_size)
+
+
+def sync_condition_and_formula(salary_component):
+    doc = frappe.get_doc("Salary Component", salary_component)
+
+    structures = frappe.get_all(
+        "Salary Detail",
+        filters={
+            "salary_component": salary_component,
+            "parenttype": "Salary Structure",
+        },
+        distinct=True,
+        pluck="parent",
+    )
+
+    if not structures:
+        return {
+            "salary_component": salary_component,
+            "synced_structures": 0,
+        }
+
+    doc.update_salary_structures(
+        structures=structures,
+        field="condition",
+        value=doc.condition or "",
+    )
+
+    doc.update_salary_structures(
+        structures=structures,
+        field="formula",
+        value=doc.formula or "",
+    )
+
+    return {
+        "salary_component": salary_component,
+        "synced_structures": len(structures),
+    }
