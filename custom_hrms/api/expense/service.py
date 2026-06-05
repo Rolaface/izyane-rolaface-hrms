@@ -240,8 +240,8 @@ def get_expense_claims(
 
     for row in expense_claims:
         expense_data = expense_map.get(row.name, {})
-        if row.approval_status  == "Cancelled":
-            row.status = "Cancelled"
+        if row.approval_status  == "Cancelled" or row.approval_status == "Rejected":
+            row.status = row.approval_status
         
         result.append(
             {

@@ -182,7 +182,7 @@ def update_expense_claim_status(claim_id: str, status: str):
             doc.status = "Rejected"
             doc.approved_by = frappe.session.user
             doc.save(ignore_permissions=True)
-            doc.submit()
+            # doc.submit()
 
         elif status == "Cancelled":
             if current_docstatus == 1:
@@ -233,6 +233,12 @@ def get_by_id():
 
     try:
         expense_claim = frappe.get_doc("Expense Claim", claim_id).as_dict()
+        meta_fields = frappe.db.get_value(
+                                            "Expense Claim",
+                                            claim_id,
+                                            ["_comments"],
+                                            as_dict=True
+                                        )
         attachments = frappe.db.get_all(
                                         "File",
                                         filters={
@@ -251,6 +257,7 @@ def get_by_id():
                                         order_by="creation desc",
                                     )
         expense_claim["attachments"] = attachments
+        expense_claim["comments"] = meta_fields.get("_comments", None)
         if expense_claim.get("advances"):
             for advance in expense_claim["advances"]:
                 advance_doc = frappe.get_doc("Employee Advance", advance.employee_advance)
