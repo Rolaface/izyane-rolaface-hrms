@@ -158,7 +158,7 @@ def get_expense_claims(
     expense_claims = frappe.get_all(
         "Expense Claim",
         filters=filters,
-        or_filters = or_filters if search else None,
+        or_filters = or_filters,
         fields=[
             "name",
             "employee",
