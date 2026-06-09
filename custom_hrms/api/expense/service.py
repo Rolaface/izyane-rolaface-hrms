@@ -130,16 +130,21 @@ def get_expense_claims(
     if company:
         filters["company"] = company
 
-    if approval_status:
-        filters["approval_status"] = approval_status
     or_filters = []
+
+    if approval_status:
+        or_filters.extend([
+            ["approval_status", "=", approval_status],
+            ["status", "=", approval_status],
+        ])
+
     if search:
-        or_filters = [
+         or_filters.extend([
             ["name", "like", f"%{search}%"],
             ["employee_name", "like", f"%{search}%"],
             ["expense_approver", "like", f"%{search}%"],
             ["employee", "like", f"%{search}%"],
-        ]
+        ])
 
     total = frappe.db.count(
         "Expense Claim",
