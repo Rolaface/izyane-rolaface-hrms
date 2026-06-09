@@ -282,7 +282,7 @@ def get_users():
     try:
         data = _fetch_paginated_autosuggest(
             doctype="User",
-            filters=frappe._dict({}),
+            filters=frappe._dict({"enabled": 1}),
             search_fields=["name", "full_name"],
             field_map={
                 "value": "name",
