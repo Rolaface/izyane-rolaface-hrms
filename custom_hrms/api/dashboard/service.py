@@ -1,7 +1,7 @@
 import math
 import frappe
 from frappe.utils import flt, nowdate, getdate, add_months, get_first_day, get_last_day, nowdate
-
+from datetime import date
 
 
 def get_employee_status_counts():
@@ -102,6 +102,44 @@ def get_employee_status_counts():
             "docstatus": 1
         }
     )
+    # --- Upcoming Birthdays Logic ---
+    birthdays = frappe.db.get_all(
+        "Employee",
+        filters={
+            "status": "Active",
+            "company": company,
+            "date_of_birth": ["is", "set"]
+        },
+        fields=["employee_name", "date_of_birth"],
+    )
+
+    today_date = getdate(nowdate())
+    upcoming_birthdays_list = []
+
+    for emp in birthdays:
+        dob = getdate(emp.date_of_birth)
+        next_birthday = date(
+            today_date.year,
+            dob.month,
+            dob.day    
+        )
+
+        if next_birthday < today_date:
+            next_birthday = date(
+                today_date.year + 1,
+                dob.month,
+                dob.day
+            )
+        
+        days_left = (next_birthday - today_date).days
+
+        upcoming_birthdays_list.append({
+            "employeeName": emp.employee_name,
+            "dateOfBirth": str(emp.date_of_birth),
+            "daysLeft": days_left
+        })
+
+    upcoming_birthdays_list.sort(key=lambda x: x["daysLeft"])
 
     return {
         "total_active": total_active,
@@ -117,6 +155,7 @@ def get_employee_status_counts():
         "wfh_today": wfh_today,
         "half_day_today": half_day_today,
         "absent_today": absent_today,
+        "upcoming_birthdays": upcoming_birthdays_list[:4]
     }
 
 def get_hr_dashboard_data(year=None):
