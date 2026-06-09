@@ -281,3 +281,47 @@ def get_by_id():
             status_code=500,
             http_status=500,
         )
+    
+@frappe.whitelist(allow_guest=False, methods=["PUT"])
+def update():
+    try:
+        claim_id = frappe.request.args.get("id")
+        data = frappe.local.form_dict
+
+        if not claim_id:
+            return send_response(
+                status="fail",
+                message="Expense Claim ID is required.",
+                data=None,
+                status_code=400,
+                http_status=400
+            )
+
+        doc = frappe.get_doc("Expense Claim", claim_id)
+        doc.update(data)
+
+        doc.save(ignore_permissions=True)
+
+        return send_response(
+            status="success",
+            message="Expense Claim updated successfully.",
+            data=doc,
+            status_code=200,
+            http_status=200
+        )
+
+    except Exception as e:
+        if db := getattr(frappe.local, "db", None):
+            db.rollback(chain=True)
+        else:
+            frappe.db.rollback()
+
+        frappe.log_error(frappe.get_traceback(), "Update Expense Claim API Error")
+
+        return send_response(
+            status="fail",
+            message=str(e),
+            data=None,
+            status_code=500,
+            http_status=500
+        )
