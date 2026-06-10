@@ -233,6 +233,14 @@ def get_by_id():
 
     try:
         expense_claim = frappe.get_doc("Expense Claim", claim_id).as_dict()
+        account_details = frappe.db.get_value("Account", expense_claim.get("payable_account"), 
+                                              ["account_name", "account_number"], as_dict=True
+                                              )
+        if account_details["account_number"]:
+            expense_claim["payable_account_name"] = f"{account_details.get('account_number', '')} - {account_details.get('account_name', '')}"
+        else:
+            expense_claim["payable_account_name"] = account_details.get("account_name", "")
+
         meta_fields = frappe.db.get_value(
                                             "Expense Claim",
                                             claim_id,
