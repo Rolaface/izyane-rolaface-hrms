@@ -133,10 +133,10 @@ def get_expense_claims(
     or_filters = []
 
     if approval_status:
-        or_filters.extend([
-            ["approval_status", "=", approval_status],
-            ["status", "=", approval_status],
-        ])
+        if approval_status not in ["Paid", "Unpaid"]:
+            filters["approval_status"] = approval_status
+        else:
+            filters["status"] = approval_status
 
     if search:
          or_filters.extend([
