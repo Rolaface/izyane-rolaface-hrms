@@ -433,7 +433,10 @@ def get_payroll_entry_list(
 
     or_filters = []
     if search:
-        or_filters.append(["name", "like", f"%{search}%"])
+         or_filters = [
+        ["name", "like", f"%{search}%"],
+        ["status", "like", f"%{search}%"],
+    ]
 
     allowed_sort_fields = [
         "name",
