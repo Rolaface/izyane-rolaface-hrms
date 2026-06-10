@@ -239,6 +239,8 @@ def get_payroll_entries():
         status = frappe.request.args.get("status")
         if status:
             filters["status"] = status
+        from_date = frappe.request.args.get("from_date")
+        to_date   = frappe.request.args.get("to_date")
 
         data, total_count, total_pages = service.get_payroll_entry_list(
             filters=filters, 
@@ -246,7 +248,9 @@ def get_payroll_entries():
             page_size=page_size,
             search=search,
             sort_by=sort_by,
-            sort_order=sort_order
+            sort_order=sort_order,
+            start_date=from_date,
+            end_date=to_date
         )
 
         response_data = {

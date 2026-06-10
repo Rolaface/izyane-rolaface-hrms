@@ -418,7 +418,7 @@ def generate_salary_slip_preview(
 
 
 def get_payroll_entry_list(
-    filters, page=1, page_size=20, search="", sort_by="creation", sort_order="desc"
+    filters, page=1, page_size=20, search="", sort_by="creation", sort_order="desc", start_date=None, end_date=None
 ):
     start = (page - 1) * page_size
     fields = [
@@ -432,8 +432,19 @@ def get_payroll_entry_list(
     ]
 
     or_filters = []
+    if start_date and end_date:
+     filters["start_date"] = ["between", [start_date, end_date]]
+    elif start_date:
+     filters["start_date"] = [">=", start_date]
+    elif end_date:
+     filters["end_date"] = ["<=", end_date]
     if search:
-        or_filters.append(["name", "like", f"%{search}%"])
+         or_filters = [
+        ["name", "like", f"%{search}%"],
+        ["status", "like", f"%{search}%"],
+        
+    
+    ]
 
     allowed_sort_fields = [
         "name",
