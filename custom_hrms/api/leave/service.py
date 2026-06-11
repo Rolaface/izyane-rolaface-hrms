@@ -52,15 +52,17 @@ def get_employee_details_data(employee_id):
     # Fetch leave balances
     leave_balances_data = frappe.db.sql("""
         SELECT 
-            leave_type, 
-            COALESCE(SUM(CASE WHEN is_carry_forward = 1 AND leaves > 0 THEN leaves ELSE 0 END), 0) AS opening_balance,
-            COALESCE(SUM(CASE WHEN transaction_type = 'Leave Allocation' AND is_carry_forward = 0 AND leaves > 0 THEN leaves ELSE 0 END), 0) AS new_leaves_allocated,
-            COALESCE(SUM(CASE WHEN transaction_type = 'Leave Application' AND leaves < 0 THEN ABS(leaves) ELSE 0 END), 0) AS leaves_taken,
-            COALESCE(SUM(CASE WHEN is_expired = 1 AND leaves < 0 THEN ABS(leaves) ELSE 0 END), 0) AS leaves_expired,
-            COALESCE(SUM(leaves), 0) AS balance
-        FROM `tabLeave Ledger Entry`
-        WHERE employee = %(employee)s
-        GROUP BY leave_type
+            L.leave_type, 
+            COALESCE(SUM(CASE WHEN L.is_carry_forward = 1 AND L.leaves > 0 THEN L.leaves ELSE 0 END), 0) AS opening_balance,
+            COALESCE(SUM(CASE WHEN L.transaction_type = 'Leave Allocation' AND L.is_carry_forward = 0 AND L.leaves > 0 THEN L.leaves ELSE 0 END), 0) AS new_leaves_allocated,
+            COALESCE(SUM(CASE WHEN L.transaction_type = 'Leave Application' AND L.leaves < 0 THEN ABS(L.leaves) ELSE 0 END), 0) AS leaves_taken,
+            COALESCE(SUM(CASE WHEN L.is_expired = 1 AND L.leaves < 0 THEN ABS(L.leaves) ELSE 0 END), 0) AS leaves_expired,
+            COALESCE(SUM(leaves), 0) AS balance,
+            T.include_holiday
+        FROM `tabLeave Ledger Entry` L, `tabLeave Type` T
+        WHERE L.employee = %(employee)s
+        AND L.leave_type = T.name
+        GROUP BY L.leave_type
     """, {"employee": employee_id}, as_dict=True)
 
     # Fetch recent timesheets
