@@ -162,12 +162,7 @@ def get_expense_claims(
     total_pages = math.ceil(total / page_size) if total else 1
 
     start = (page - 1) * page_size
-
-    expense_claims = frappe.get_all(
-        "Expense Claim",
-        filters=filters,
-        or_filters = or_filters,
-        fields=[
+    fields=[
             "name",
             "employee",
             "employee_name",
@@ -185,11 +180,28 @@ def get_expense_claims(
             "modified",
             "owner",
             "total_amount_reimbursed"
-        ],
-        order_by=f"{sort_by} {sort_order}",
-        limit_start=start,
-        limit_page_length=page_size,
-    )
+        ]
+
+    expense_claims = frappe.call(
+                                 frappe.client.get_list, 
+                                 "Expense Claim", 
+                                 fields=fields, 
+                                 filters=filters,
+                                 or_filters=or_filters, 
+                                 order_by=f"{sort_by} {sort_order}", 
+                                 limit_start=start, 
+                                 limit_page_length=page_size
+                                )
+
+    # expense_claims = frappe.get_all(
+    #     "Expense Claim",
+    #     filters=filters,
+    #     or_filters = or_filters,
+    #     fields=fields,
+    #     order_by=f"{sort_by} {sort_order}",
+    #     limit_start=start,
+    #     limit_page_length=page_size,
+    # )
 
     claim_names = [d.name for d in expense_claims]
 
