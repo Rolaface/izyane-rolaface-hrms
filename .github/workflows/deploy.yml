@@ -43,7 +43,7 @@ jobs:
 
               echo '⬇️ Pull latest code...'
               cd apps/custom_hrms
-              git fetch origin version-16 && git reset --hard origin/version-16 || { echo '❌ Git pull failed'; exit 1; }
+              git pull upstream version-16 || { echo '❌ Git pull failed'; exit 1; }
               cd \"$BENCH_DIR\"
 
               echo '⚙️ Run migrations...'
