@@ -2,14 +2,21 @@ import frappe
 from custom_hrms.utils.response import send_response
 
 @frappe.whitelist(allow_guest=False, methods=["GET"])
-def get_by_id(id):
+def get_by_id(id, from_date=None, to_date=None):
     try:
         employee_advance_doc = frappe.get_doc("Employee Advance", id).as_dict()
+        filters = {"employee_advance": id}
+        
+        if from_date:
+            filters["posting_date"] = [">=", from_date]
+        if to_date:
+            filters["posting_date"] = ["<=", to_date]
+        if from_date and to_date:
+            filters["posting_date"] = ["between", [from_date, to_date]]
+
         expense_claim_advance = frappe.get_all(
                                                 "Expense Claim Advance",
-                                                filters={
-                                                    "employee_advance": id
-                                                },
+                                                filters=filters,
                                                 fields=["*"]
                                             )
         for claim in expense_claim_advance:
