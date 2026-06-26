@@ -12,6 +12,13 @@ def get_by_id(id):
                                                 },
                                                 fields=["*"]
                                             )
+        for claim in expense_claim_advance:
+            claim_doc = frappe.get_doc("Expense Claim", claim.parent).as_dict()
+            if claim_doc:
+                expenses = claim_doc.get("expenses", [])
+                claim.claim_title = expenses[0].get("expense_type") if expenses else None
+                claim.description = claim_doc.get("remark")
+
         employee_advance_doc["expense_claims"] = expense_claim_advance
         return send_response(
                                 status="success",
