@@ -1,4 +1,4 @@
-from apps.custom_hrms.custom_hrms.api.employee_advance.service import get_employee_advance_by_id_with_claims
+from custom_hrms.api.employee_advance.service import get_employee_advance_by_id_with_claims
 import frappe
 from custom_hrms.utils.response import send_response
 from frappe.utils.pdf import get_pdf
