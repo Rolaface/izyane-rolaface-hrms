@@ -1,32 +1,14 @@
+from apps.custom_hrms.custom_hrms.api.employee_advance.service import get_employee_advance_by_id_with_claims
 import frappe
 from custom_hrms.utils.response import send_response
+from frappe.utils.pdf import get_pdf
 
 @frappe.whitelist(allow_guest=False, methods=["GET"])
 def get_by_id(id, from_date=None, to_date=None):
     try:
-        employee_advance_doc = frappe.get_doc("Employee Advance", id).as_dict()
-        filters = {"employee_advance": id}
-        
-        if from_date:
-            filters["posting_date"] = [">=", from_date]
-        if to_date:
-            filters["posting_date"] = ["<=", to_date]
-        if from_date and to_date:
-            filters["posting_date"] = ["between", [from_date, to_date]]
 
-        expense_claim_advance = frappe.get_all(
-                                                "Expense Claim Advance",
-                                                filters=filters,
-                                                fields=["*"]
-                                            )
-        for claim in expense_claim_advance:
-            claim_doc = frappe.get_doc("Expense Claim", claim.parent).as_dict()
-            if claim_doc:
-                expenses = claim_doc.get("expenses", [])
-                claim.claim_title = expenses[0].get("expense_type") if expenses else None
-                claim.description = claim_doc.get("remark")
+        employee_advance_doc = get_employee_advance_by_id_with_claims(id, from_date, to_date)
 
-        employee_advance_doc["expense_claims"] = expense_claim_advance
         return send_response(
                                 status="success",
                                 message=None,
@@ -43,3 +25,42 @@ def get_by_id(id, from_date=None, to_date=None):
             status_code=500,
             http_status=500,
         )
+
+@frappe.whitelist(allow_guest=False, methods=["GET"])
+def generate_advance_statement_pdf():
+    id = frappe.form_dict.get("id")
+    from_date = frappe.form_dict.get("from_date")
+    to_date = frappe.form_dict.get("to_date")
+
+    if not id:
+        frappe.throw(_("Advance must not be null"))
+
+    employee_advance = frappe.db.exists("Employee Advance", id)
+
+    if not employee_advance:
+        frappe.throw(_(f"Advance not found"))
+
+    statement_data = get_employee_advance_by_id_with_claims(id, from_date, to_date)
+    ADVANCE_STATEMENT_TEMPLATE = "custom_api/templates/employee_advance_statement.html"
+    html = frappe.render_template(ADVANCE_STATEMENT_TEMPLATE, {
+                                                    "doc": statement_data,
+                                                    "from_date": from_date,
+                                                    "to_date": to_date,
+                                                    "frappe": frappe
+                                                })
+
+    pdf_options = {
+        "page-size": "A4",
+        "margin-top": "15mm",
+        "margin-right": "10mm",
+        "margin-bottom": "10mm",
+        "margin-left": "15mm",
+        "encoding": "UTF-8",
+        "no-outline": None
+    }
+
+    pdf = get_pdf(html, options=pdf_options)
+
+    frappe.local.response.filename = f"{statement_data.name}.pdf"
+    frappe.local.response.filecontent = pdf
+    frappe.local.response.type = "download"
