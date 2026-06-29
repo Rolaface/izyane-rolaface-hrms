@@ -1,3 +1,4 @@
+from frappe import _
 from custom_hrms.api.employee_advance.service import get_employee_advance_by_id_with_claims
 import frappe
 from custom_hrms.utils.response import send_response
@@ -16,7 +17,7 @@ def get_by_id(id, from_date=None, to_date=None):
                             )
 
     except Exception as e:
-        frappe.log_error("Error in Emoplyee Advance By id: ", str(e))
+        frappe.log_error("Error in Employee Advance By id: ", str(e))
 
         return send_response(
             status="error",
@@ -33,12 +34,10 @@ def generate_advance_statement_pdf():
     to_date = frappe.form_dict.get("to_date")
 
     if not id:
-        frappe.throw(_("Advance must not be null"))
+        frappe.throw(_("Advance ID must not be null"))
 
-    employee_advance = frappe.db.exists("Employee Advance", id)
-
-    if not employee_advance:
-        frappe.throw(_(f"Advance not found"))
+    if not frappe.db.exists("Employee Advance", id):
+        frappe.throw(_(f"Advance {id} not found"))
 
     statement_data = get_employee_advance_by_id_with_claims(id, from_date, to_date)
     ADVANCE_STATEMENT_TEMPLATE = "custom_hrms/templates/employee_advance_statement.html"
@@ -61,6 +60,6 @@ def generate_advance_statement_pdf():
 
     pdf = get_pdf(html, options=pdf_options)
 
-    frappe.local.response.filename = f"{statement_data.name}.pdf"
+    frappe.local.response.filename = f"{statement_data.get('name')}.pdf"
     frappe.local.response.filecontent = pdf
     frappe.local.response.type = "download"
