@@ -1,0 +1,433 @@
+<!DOCTYPE html>
+    <html>
+    <head>
+    <meta charset="utf-8">
+    <style>
+    *{
+        margin:0;
+        padding:0;
+        box-sizing:border-box;
+    }
+    body{
+        font-family:Arial,Helvetica,sans-serif;
+        font-size:11px;
+        color:#334155;
+        padding:0; 
+        margin:0;
+        line-height:1.5;
+        background:#ffffff;
+    }
+    .text-right{
+        text-align:right !important;
+    }
+    .text-center{
+        text-align:center !important;
+    }
+    .header{
+        width:100%;
+        margin-bottom:20px;
+        border-bottom:2px solid #e2e8f0;
+        padding-bottom:16px;
+    }
+    .header-table{
+        width:100%;
+        border-collapse:collapse;
+        table-layout: fixed;
+    }
+    .document-title-block {
+        text-align: center;
+        margin-bottom: 24px;
+    }
+    .company-logo {
+        max-height: 45px;
+        max-width: 150px;
+        object-fit: contain;
+        display: inline-block;
+        border-radius: 4px;
+    }
+    .company-name{
+        font-size:20px;
+        font-weight:700;
+        color:#0f172a;
+        margin-bottom:6px;
+        line-height: 1.2;
+        word-wrap: break-word;
+    }
+    .company-meta{
+        color:#64748b;
+        font-size:11px;
+        line-height: 1.6;
+    }
+    .statement-title{
+        font-size:22px;
+        font-weight:700;
+        color:#0f172a;
+        text-transform:uppercase;
+        letter-spacing:1px;
+        line-height: 1.2;
+    }
+    .statement-date{
+        color:#64748b;
+        margin-top:4px;
+        font-size: 10px;
+    }
+    .info-card{
+        width:100%;
+        border:1px solid #e2e8f0;
+        background:#f8fafc;
+        border-radius:8px;
+        padding:14px 16px;
+        margin-bottom:20px;
+    }
+    .info-table{
+        width:100%;
+        border-collapse:collapse;
+    }
+    .info-table td {
+        vertical-align: top;
+        padding: 4px 0;
+    }
+    .label{
+        font-size:9px;
+        color:#94a3b8;
+        font-weight:700;
+        text-transform:uppercase;
+    }
+    .value{
+        font-size:13px;
+        color:#0f172a;
+        font-weight:700;
+        margin-top:4px;
+    }
+    .value-normal {
+        font-size:11px;
+        color:#334155;
+        margin-top:2px;
+    }
+    .muted{
+        color:#64748b;
+        font-size:10px;
+        margin-top: 4px;
+    }
+    .metrics{
+        width:100%;
+        border-collapse:collapse;
+        table-layout:fixed;
+        margin-bottom:24px;
+    }
+    .metrics td {
+        padding: 0 4px;
+    }
+    .metrics td:first-child {
+        padding-left: 0;
+    }
+    .metrics td:last-child {
+        padding-right: 0;
+    }
+    .metric{
+        border:1px solid #e2e8f0;
+        border-radius:8px;
+        padding:12px 8px;
+        background:#ffffff;
+        height: 100%;
+        word-wrap: break-word;
+    }
+    .metric.advance{ background:#f8fafc; }
+    .metric.claimed{ background:#f0fdf4; }
+    .metric.unclaimed{ background:#eff6ff; }
+    .metric.status{ background:#fef2f2; }
+    .metric-label{
+        font-size:10px;
+        text-transform:uppercase;
+        color:#64748b;
+        font-weight:700;
+    }
+    .metric-value{
+        margin-top:6px;
+        font-size:13px;
+        font-weight:700;
+        color:#0f172a;
+        overflow-wrap: break-word;
+        word-break: break-word;
+    }
+    .status-badge {
+        display: inline-block;
+        padding: 2px 8px;
+        border-radius: 12px;
+        font-size: 10px;
+        font-weight: 700;
+    }
+    .status-paid { background:#dcfce7; color:#15803d; }
+    .status-claimed { background:#dbeafe; color:#1d4ed8; }
+    .status-partially-claimed { background:#fef3c7; color:#b45309; }
+    .status-unpaid { background:#fef2f2; color:#dc2626; }
+    .section-title{
+        font-size:14px;
+        font-weight:700;
+        color:#0f172a;
+        margin-bottom:10px;
+    }
+    .ledger{
+        width:100%;
+        border-collapse:collapse;
+        table-layout:fixed;
+    }
+    .ledger thead{
+        display:table-header-group;
+    }
+    .ledger th{
+        background:#f8fafc;
+        color:#475569;
+        text-transform:uppercase;
+        font-size:9px;
+        padding:8px 4px;
+        border-bottom:2px solid #cbd5e1;
+        text-align:left;
+    }
+    .ledger td{
+        padding:8px 4px;
+        border-bottom:1px solid #e2e8f0;
+        vertical-align:middle;
+        word-wrap:break-word;
+        font-size:9px;
+    }
+    .ledger th.text-right,
+    .ledger td.text-right{
+        text-align:right !important;
+    }
+    .ledger tbody tr:nth-child(even){
+        background:#fafafa;
+    }
+    .amount-debit{
+        color:#dc2626;
+        font-size:9px;
+        white-space:nowrap;
+        font-variant-numeric: tabular-nums;
+    }
+    .amount-credit{
+        color:#16a34a;
+        font-size:9px;
+        white-space:nowrap;
+        font-variant-numeric: tabular-nums;
+    }
+    .amount-neutral{
+        color:#0f172a;
+        font-size:9px;
+        white-space:nowrap;
+        font-variant-numeric: tabular-nums;
+    }
+    .badge{
+        padding:3px 6px;
+        border-radius:12px;
+        font-size:8px;
+        font-weight:700;
+        white-space:nowrap;
+    }
+    .badge-claim{ background:#dbeafe; color:#1d4ed8; }
+    .badge-payment{ background:#dcfce7; color:#15803d; }
+    .badge-journal{ background:#ede9fe; color:#6d28d9; }
+    .badge-other{ background:#fef3c7; color:#b45309; }
+    .statement-footer-section {
+        page-break-inside: avoid;
+        margin-top: 20px;
+    }
+    .discrepancy-clause {
+        padding: 10px 14px;
+        background-color: #f8fafc;
+        border-left: 4px solid #94a3b8;
+        border-radius: 4px;
+        font-size: 10px;
+        color: #475569;
+    }
+    .footer{
+        margin-top:12px;
+        padding-top:12px;
+        border-top:1px solid #e2e8f0;
+        text-align:center;
+        color:#94a3b8;
+        font-size:9px;
+    }
+    .nowrap {
+        white-space: nowrap;
+    }
+    .divider {
+        border: none;
+        border-top: 1px solid #e2e8f0;
+        margin: 16px 0;
+    }
+    </style>
+    </head>
+    <body>
+
+    <!-- HEADER -->
+    <div class="header">
+        <div class="document-title-block">
+            <div class="statement-title">Employee Advance Statement</div>
+            <div class="statement-date">
+                Generated on {{ frappe.utils.formatdate(frappe.utils.nowdate()) }}
+            </div>
+        </div>
+
+        <table class="header-table">
+            <tr>
+                {% set company = frappe.get_doc("Company", doc.company) %}
+                <td style="width:50%; vertical-align:top; padding-right:10px;">
+                    <div class="company-name">{{ company.company_name }}</div>
+                    <div class="company-meta">
+                        {% if company.tax_id %}Tax ID: {{ company.tax_id }}<br>{% endif %}
+                        {% if company.email %}{{ company.email }}<br>{% endif %}
+                        {% if company.phone_no %}{{ company.phone_no }}<br>{% endif %}
+                        {% if company.company_address %}{{ company.company_address }}{% endif %}
+                    </div>
+                </td>
+                <td style="width:50%; vertical-align:top;" class="text-right">
+                    {% if company.company_logo %}
+                        <img src="{{ company.company_logo }}" class="company-logo" alt="Company Logo">
+                    {% endif %}
+                </td>
+            </tr>
+        </table>
+    </div>
+
+    <!-- EMPLOYEE & ADVANCE INFO -->
+    <div class="info-card">
+        <table class="info-table">
+            <tr>
+                <td width="25%">
+                    <div class="label">Employee</div>
+                    <div class="value">{{ doc.employee_name }}</div>
+                    <div class="muted">ID: {{ doc.employee }}</div>
+                </td>
+                <td width="25%">
+                    <div class="label">Department</div>
+                    <div class="value-normal">{{ doc.department or '-' }}</div>
+                    <div class="label" style="margin-top:8px;">Purpose</div>
+                    <div class="value-normal">{{ doc.purpose or '-' }}</div>
+                </td>
+                <td width="25%">
+                    <div class="label">Advance Reference</div>
+                    <div class="value">{{ doc.name }}</div>
+                    <div class="label" style="margin-top:8px;">Posting Date</div>
+                    <div class="value-normal">{{ frappe.utils.formatdate(doc.posting_date) }}</div>
+                </td>
+                <td width="25%" align="right" style="vertical-align:top;">
+                    <div class="label">Status</div>
+                    <div style="margin-top:4px;">
+                        {% if doc.status == 'Paid' %}
+                            <span class="status-badge status-paid">{{ doc.status }}</span>
+                        {% elif doc.status == 'Claimed' %}
+                            <span class="status-badge status-claimed">{{ doc.status }}</span>
+                        {% elif doc.status == 'Partly Claimed and Return' %}
+                            <span class="status-badge status-partially-claimed">Partly Claimed</span>
+                        {% else %}
+                            <span class="status-badge status-unpaid">{{ doc.status }}</span>
+                        {% endif %}
+                    </div>
+                    <div class="label" style="margin-top:8px;">Mode of Payment</div>
+                    <div class="value-normal">{{ doc.mode_of_payment or '-' }}</div>
+                </td>
+            </tr>
+        </table>
+    </div>
+
+    <!-- SUMMARY METRICS -->
+    <table class="metrics">
+        <tr>
+            <td>
+                <div class="metric advance">
+                    <div class="metric-label">Advance Amount</div>
+                    <div class="metric-value">{{ frappe.format_value(doc.advance_amount, {"fieldtype":"Currency", "currency": doc.currency}) }}</div>
+                </div>
+            </td>
+            <td>
+                <div class="metric claimed">
+                    <div class="metric-label">Claimed Amount</div>
+                    <div class="metric-value">{{ frappe.format_value(doc.claimed_amount, {"fieldtype":"Currency", "currency": doc.currency}) }}</div>
+                </div>
+            </td>
+            <td>
+                <div class="metric unclaimed">
+                    <div class="metric-label">Pending Amount</div>
+                    <div class="metric-value">{{ frappe.format_value(doc.pending_amount, {"fieldtype":"Currency", "currency": doc.currency}) }}</div>
+                </div>
+            </td>
+            <td>
+                <div class="metric status">
+                    <div class="metric-label">Return Amount</div>
+                    <div class="metric-value">{{ frappe.format_value(doc.return_amount, {"fieldtype":"Currency", "currency": doc.currency}) }}</div>
+                </div>
+            </td>
+        </tr>
+    </table>
+
+    <!-- EXPENSE CLAIMS TABLE -->
+    <div class="section-title">Expense Claims</div>
+    <table class="ledger">
+        <thead>
+            <tr>
+                <th style="width:8%">Date</th>
+                <th style="width:18%">Claim Reference</th>
+                <th style="width:15%">Claim Type</th>
+                <th style="width:17%">Description</th>
+                <th style="width:10%" class="text-right">Advance Paid</th>
+                <th style="width:10%" class="text-right">Allocated</th>
+                <th style="width:10%" class="text-right">Unclaimed</th>
+                <th style="width:7%">Status</th>
+            </tr>
+        </thead>
+        <tbody>
+        {% for claim in doc.expense_claims %}
+            <tr>
+                <td class="nowrap">
+                    {{ frappe.utils.formatdate(claim.posting_date) if claim.posting_date else '-' }}
+                </td>
+                <td class="nowrap">{{ claim.parent }}</td>
+                <td>
+                    {% if claim.claim_title %}
+                        <span class="badge badge-claim">{{ claim.claim_title }}</span>
+                    {% else %}
+                        -
+                    {% endif %}
+                </td>
+                <td>{{ claim.description or '-' }}</td>
+                <td class="text-right amount-debit">
+                    {{ frappe.format_value(claim.advance_paid, {"fieldtype":"Currency", "currency": doc.currency}) if claim.advance_paid else '-' }}
+                </td>
+                <td class="text-right amount-credit">
+                    {{ frappe.format_value(claim.allocated_amount, {"fieldtype":"Currency", "currency": doc.currency}) if claim.allocated_amount else '-' }}
+                </td>
+                <td class="text-right amount-neutral">
+                    {{ frappe.format_value(claim.unclaimed_amount, {"fieldtype":"Currency", "currency": doc.currency}) if claim.unclaimed_amount else '-' }}
+                </td>
+                <td>
+                    {% if claim.docstatus == 1 %}
+                        <span class="badge badge-payment">Submitted</span>
+                    {% elif claim.docstatus == 2 %}
+                        <span class="badge badge-other">Cancelled</span>
+                    {% else %}
+                        <span class="badge badge-journal">Draft</span>
+                    {% endif %}
+                </td>
+            </tr>
+        {% else %}
+            <tr>
+                <td colspan="8" style="text-align:center; padding:30px; color:#94a3b8;">
+                    No expense claims linked to this advance.
+                </td>
+            </tr>
+        {% endfor %}
+        </tbody>
+    </table>
+
+    <!-- FOOTER -->
+    <div class="statement-footer-section">
+        <div class="discrepancy-clause">
+            <strong>Discrepancy Note:</strong> Kindly notify us of any discrepancies in this statement within 15 days of receipt. If no discrepancies are reported within this period, the statement will be considered accurate and accepted.
+        </div>
+        <div class="footer">
+            This is a system generated employee advance statement and does not require a signature.
+        </div>
+    </div>
+
+    </body>
+    </html>

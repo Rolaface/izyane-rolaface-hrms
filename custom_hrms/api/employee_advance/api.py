@@ -41,7 +41,7 @@ def generate_advance_statement_pdf():
         frappe.throw(_(f"Advance not found"))
 
     statement_data = get_employee_advance_by_id_with_claims(id, from_date, to_date)
-    ADVANCE_STATEMENT_TEMPLATE = "custom_api/templates/employee_advance_statement.html"
+    ADVANCE_STATEMENT_TEMPLATE = "custom_hrms/templates/employee_advance_statement.html"
     html = frappe.render_template(ADVANCE_STATEMENT_TEMPLATE, {
                                                     "doc": statement_data,
                                                     "from_date": from_date,
