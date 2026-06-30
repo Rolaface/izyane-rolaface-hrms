@@ -5,10 +5,10 @@ from custom_hrms.utils.response import send_response
 from frappe.utils.pdf import get_pdf
 
 @frappe.whitelist(allow_guest=False, methods=["GET"])
-def get_by_id(id, from_date=None, to_date=None):
+def get_by_id(id, from_date=None, to_date=None,page=1, page_size=10):
     try:
 
-        employee_advance_doc = get_employee_advance_by_id_with_claims(id, from_date, to_date)
+        employee_advance_doc = get_employee_advance_by_id_with_claims(id, from_date, to_date, page, page_size)
 
         return send_response(
                                 status="success",
