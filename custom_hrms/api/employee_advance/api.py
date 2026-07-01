@@ -32,8 +32,8 @@ def generate_advance_statement_pdf():
     id = frappe.form_dict.get("id")
     from_date = frappe.form_dict.get("from_date")
     to_date = frappe.form_dict.get("to_date")
-    page = frappe.form_dict("page", 1)
-    page_size = frappe.form_dict("page_size", 10)
+    page = frappe.form_dict.get("page", 1)
+    page_size = frappe.form_dict.get("page_size", 10)
     if not id:
         frappe.throw(_("Advance ID must not be null"))
 
