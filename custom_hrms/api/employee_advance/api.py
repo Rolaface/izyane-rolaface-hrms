@@ -32,14 +32,15 @@ def generate_advance_statement_pdf():
     id = frappe.form_dict.get("id")
     from_date = frappe.form_dict.get("from_date")
     to_date = frappe.form_dict.get("to_date")
-
+    page = frappe.form_dict("page", 1)
+    page_size = frappe.form_dict("page_size", 10)
     if not id:
         frappe.throw(_("Advance ID must not be null"))
 
     if not frappe.db.exists("Employee Advance", id):
         frappe.throw(_(f"Advance {id} not found"))
 
-    statement_data = get_employee_advance_by_id_with_claims(id, from_date, to_date)
+    statement_data = get_employee_advance_by_id_with_claims(id, from_date, to_date, page, page_size)
     ADVANCE_STATEMENT_TEMPLATE = "custom_hrms/templates/employee_advance_statement.html"
     html = frappe.render_template(ADVANCE_STATEMENT_TEMPLATE, {
                                                     "doc": statement_data,
