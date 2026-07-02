@@ -375,8 +375,15 @@ def generate_salary_slip_preview(
             slip.exchange_rate = exchange_rate
 
         slip.get_emp_and_working_day_details()
+        
+        if hasattr(slip, "set_payroll_period"):
+            slip.set_payroll_period()
+            
         slip.process_salary_structure()
         slip.calculate_net_pay()
+
+        if hasattr(slip, "compute_year_to_date"):
+            slip.compute_year_to_date()
 
         net_payable = slip.rounded_total or slip.net_pay or 0.0
 
