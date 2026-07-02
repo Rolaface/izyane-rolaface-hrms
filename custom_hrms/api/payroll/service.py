@@ -516,20 +516,85 @@ def get_payroll_entry_details(payroll_entry_id):
     breakdown_list = financial_summary.get("employee_breakdown", [])
     breakdown_map = {b["employee"]: b for b in breakdown_list}
 
+    employee_ids = [
+        emp.get("employee")
+        for emp in raw_doc.get("employees", [])
+        if emp.get("employee")
+    ]
+
+    employees = frappe.get_all(
+        "Employee",
+        filters={"name": ["in", employee_ids]},
+        fields=["name", "gender"],
+    )
+
+    gender_map = {
+        emp["name"]: emp["gender"]
+        for emp in employees
+    }
+
     doc_dict["employees"] = []
-    if "employees" in raw_doc:
-        for emp in raw_doc["employees"]:
-            emp_id = emp.get("employee")
-            clean_emp = {
-                "employee": emp_id,
-                "employee_name": emp.get("employee_name"),
-                "department": emp.get("department"),
-                "designation": emp.get("designation"),
-                "salary_slip_details": breakdown_map.get(emp_id),
-            }
-            doc_dict["employees"].append(clean_emp)
+
+    for emp in raw_doc.get("employees", []):
+        emp_id = emp.get("employee")
+
+        clean_emp = {
+            "employee": emp_id,
+            "employee_name": emp.get("employee_name"),
+            "department": emp.get("department"),
+            "designation": emp.get("designation"),
+            "gender": gender_map.get(emp_id),
+            "salary_slip_details": breakdown_map.get(emp_id),
+        }
+
+        doc_dict["employees"].append(clean_emp)
 
     if financial_summary.get("last_error"):
         doc_dict["last_error"] = financial_summary.get("last_error")
 
     return doc_dict
+
+def delete_payroll_entry_and_links(payroll_entry_id: str) -> dict:
+
+    doc = frappe.get_doc("Payroll Entry", payroll_entry_id)
+
+    if doc.docstatus != 2:
+        return {
+            "status": "error",
+            "message": _("Only Cancelled Payroll Entries can be deleted.")
+        }
+
+    linked_jes = set()
+    
+    if doc.get("bank_entry"):
+        linked_jes.add(doc.bank_entry)
+
+    je_accounts = frappe.get_all(
+        "Journal Entry Account",
+        filters={
+            "reference_type": "Payroll Entry",
+            "reference_name": payroll_entry_id
+        },
+        pluck="parent"
+    )
+    linked_jes.update(je_accounts)
+
+    for je_name in linked_jes:
+        if frappe.db.exists("Journal Entry", je_name):
+            je_status = frappe.db.get_value("Journal Entry", je_name, "docstatus")
+            if je_status in [0, 2]:
+                frappe.delete_doc("Journal Entry", je_name, ignore_permissions=True)
+
+    salary_slips = frappe.get_all(
+        "Salary Slip", 
+        filters={"payroll_entry": payroll_entry_id}, 
+        pluck="name"
+    )
+    for slip_name in salary_slips:
+        slip_status = frappe.db.get_value("Salary Slip", slip_name, "docstatus")
+        if slip_status in [0, 2]:
+            frappe.delete_doc("Salary Slip", slip_name, ignore_permissions=True)
+
+    frappe.delete_doc("Payroll Entry", payroll_entry_id, ignore_permissions=True)
+
+    return {"status": "success"}
