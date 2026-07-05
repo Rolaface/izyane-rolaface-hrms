@@ -2,6 +2,7 @@ import json
 import frappe
 from frappe import _
 import math
+from frappe.utils import getdate, date_diff  # <--- NEW IMPORTS REQUIRED
 from .utils import PAYROLL_ENTRY_FIELDS, SALARY_SLIP_FIELDS, SALARY_DETAIL_FIELDS
 
 from hrms.payroll.doctype.payroll_entry.payroll_entry import (
@@ -252,6 +253,13 @@ def calculate_payroll_entry_payable(payroll_entry_id):
 
             slip_dict["status"] = slip_status
             slip_dict["net_payable"] = net_payable
+            
+            slip_dict["leaves_taken_in_payroll_period"] = get_employee_leaves_in_period(
+                employee=slip_doc.employee, 
+                start_date=slip_doc.start_date, 
+                end_date=slip_doc.end_date
+            )
+            
             breakdown.append(slip_dict)
 
         return {
@@ -376,12 +384,14 @@ def generate_salary_slip_preview(
 
         slip.get_emp_and_working_day_details()
         
+        # Determine Payroll Period to ensure YTD calculation knows when the year started
         if hasattr(slip, "set_payroll_period"):
             slip.set_payroll_period()
             
         slip.process_salary_structure()
         slip.calculate_net_pay()
 
+        # Compute YTD since we aren't saving the document
         if hasattr(slip, "compute_year_to_date"):
             slip.compute_year_to_date()
 
@@ -404,6 +414,12 @@ def generate_salary_slip_preview(
         slip_dict["gross_pay"] = slip.gross_pay or 0.0
         slip_dict["total_deduction"] = slip.total_deduction or 0.0
         slip_dict["error_message"] = None
+        
+        slip_dict["leaves_taken_in_payroll_period"] = get_employee_leaves_in_period(
+            employee=employee, 
+            start_date=start_date, 
+            end_date=end_date
+        )
 
         return slip_dict
 
@@ -421,6 +437,7 @@ def generate_salary_slip_preview(
             "total_deduction": 0.0,
             "earnings": [],
             "deductions": [],
+            "leaves_taken_in_payroll_period": 0.0
         }
 
 
@@ -605,3 +622,34 @@ def delete_payroll_entry_and_links(payroll_entry_id: str) -> dict:
     frappe.delete_doc("Payroll Entry", payroll_entry_id, ignore_permissions=True)
 
     return {"status": "success"}
+
+def get_employee_leaves_in_period(employee: str, start_date: str, end_date: str) -> float:
+    leave_apps = frappe.get_all(
+        "Leave Application",
+        filters={
+            "employee": employee,
+            "docstatus": 1,
+            "status": "Approved",
+            "from_date": ["<=", end_date],
+            "to_date": [">=", start_date]
+        },
+        fields=["from_date", "to_date", "half_day", "half_day_date"]
+    )
+    
+    total_leave_days = 0.0
+    
+    for leave in leave_apps:
+        actual_start = max(getdate(leave.from_date), getdate(start_date))
+        actual_end = min(getdate(leave.to_date), getdate(end_date))
+        
+        days = date_diff(actual_end, actual_start) + 1
+        
+        if leave.half_day and leave.half_day_date:
+            half_date = getdate(leave.half_day_date)
+            if actual_start <= half_date <= actual_end:
+                days -= 0.5
+                
+        if days > 0:
+            total_leave_days += days
+            
+    return total_leave_days
