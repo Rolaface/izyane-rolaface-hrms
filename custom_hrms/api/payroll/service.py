@@ -557,15 +557,31 @@ def get_payroll_entry_details(payroll_entry_id):
         for emp in employees
     }
 
+    department_ids = list(set([
+        emp.get("department")
+        for emp in raw_doc.get("employees", [])
+        if emp.get("department")
+    ]))
+
+    department_map = {}
+    if department_ids:
+        departments = frappe.get_all(
+            "Department",
+            filters={"name": ["in", department_ids]},
+            fields=["name", "department_name"]
+        )
+        department_map = {d["name"]: d["department_name"] for d in departments}
+
     doc_dict["employees"] = []
 
     for emp in raw_doc.get("employees", []):
         emp_id = emp.get("employee")
+        dept_id = emp.get("department")
 
         clean_emp = {
             "employee": emp_id,
             "employee_name": emp.get("employee_name"),
-            "department": emp.get("department"),
+            "department_name": department_map.get(dept_id),
             "designation": emp.get("designation"),
             "gender": gender_map.get(emp_id),
             "salary_slip_details": breakdown_map.get(emp_id),
