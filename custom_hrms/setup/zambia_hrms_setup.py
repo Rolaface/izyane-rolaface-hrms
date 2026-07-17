@@ -105,7 +105,12 @@ def create_holiday_list():
 
 def _assign_holiday_list_to_companies(holiday_list):
     companies = frappe.get_all("Company", pluck="name")
-    start_date = frappe.db.get_value("Holiday List", holiday_list, "from_date")
+    
+    start_date, end_date = frappe.db.get_value(
+        "Holiday List",
+        holiday_list,
+        ["from_date", "to_date"]
+    )
 
     for company in companies:
         frappe.db.set_value(
@@ -119,18 +124,18 @@ def _assign_holiday_list_to_companies(holiday_list):
         if not frappe.db.exists(
             "Holiday List Assignment",
             {
-                "applicable_for": "Company",
-                "company": company,
+                "assigned_to": company,
                 "holiday_list": holiday_list,
             },
         ):
             frappe.get_doc(
                 {
                     "doctype": "Holiday List Assignment",
-                    "applicable_for": "Company",
-                    "company": company,
+                    "assignment_based_on": "Company", 
+                    "assigned_to": company,          
                     "holiday_list": holiday_list,
-                    "assignment_starts_from": start_date,
+                    "from_date": start_date,         
+                    "to_date": end_date
                 }
             ).insert(ignore_permissions=True)
 
