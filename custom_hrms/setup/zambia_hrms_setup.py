@@ -155,6 +155,31 @@ def _assign_holiday_list_to_companies(holiday_list):
 
         print(f"  ✓ Assigned Holiday List to Company: {company}")
 
+def _get_active_fiscal_year(company):
+    # 1. Check if the company has a specific default set
+    fy = frappe.get_cached_value("Company", company, "default_fiscal_year")
+    if fy:
+        return fy
+        
+    # 2. Fallback to the system's global default year
+    fy = frappe.defaults.get_global_default("year")
+    if fy:
+        return fy
+        
+    # 3. Final fallback: Grab the most recent enabled fiscal year
+    active_fys = frappe.get_all(
+        "Fiscal Year", 
+        filters={"disabled": 0}, 
+        order_by="year_start_date desc", 
+        pluck="name", 
+        limit=1
+    )
+    if active_fys:
+        return active_fys[0]
+        
+    return None
+
+
 # ==========================================
 # 4. PERIODS (PAYROLL & LEAVE)
 # ==========================================
@@ -163,66 +188,54 @@ def create_periods():
     companies = frappe.get_all("Company", pluck="name")
 
     for company in companies:
-        fiscal_year = frappe.get_cached_value("Company", company, "default_fiscal_year")
+        fiscal_year = _get_active_fiscal_year(company)
 
         if not fiscal_year:
-            print(f"  ✗ {company}: No Default Fiscal Year configured.")
+            print(f"  ✗ {company}: No active Fiscal Year could be found in the system.")
             continue
 
         fy = frappe.get_doc("Fiscal Year", fiscal_year)
         _create_leave_period(company, fy)
         _create_payroll_period(company, fy)
 
-
 def _create_payroll_period(company, fiscal_year):
-    if frappe.db.exists(
-        "Payroll Period",
-        {
-            "company": company,
-            "payroll_frequency": "Monthly",
-            "start_date": fiscal_year.year_start_date,
-            "end_date": fiscal_year.year_end_date,
-        },
-    ):
+    if frappe.db.exists("Payroll Period", {
+        "company": company,
+        "payroll_frequency": "Monthly",
+        "start_date": fiscal_year.year_start_date,
+        "end_date": fiscal_year.year_end_date,
+    }):
         print(f"  • Payroll Period already exists for {company}")
         return
 
-    doc = frappe.get_doc(
-        {
-            "doctype": "Payroll Period",
-            "company": company,
-            "payroll_frequency": "Monthly",
-            "start_date": fiscal_year.year_start_date,
-            "end_date": fiscal_year.year_end_date,
-        }
-    )
+    doc = frappe.get_doc({
+        "doctype": "Payroll Period",
+        "company": company,
+        "payroll_frequency": "Monthly",
+        "start_date": fiscal_year.year_start_date,
+        "end_date": fiscal_year.year_end_date,
+    })
     doc.insert(ignore_permissions=True)
     print(f"  ✓ Created Payroll Period for {company}")
 
-
 def _create_leave_period(company, fiscal_year):
-    if frappe.db.exists(
-        "Leave Period",
-        {
-            "company": company,
-            "from_date": fiscal_year.year_start_date,
-            "to_date": fiscal_year.year_end_date,
-            "is_active": 1,
-        },
-    ):
+    if frappe.db.exists("Leave Period", {
+        "company": company,
+        "from_date": fiscal_year.year_start_date,
+        "to_date": fiscal_year.year_end_date,
+        "is_active": 1,
+    }):
         print(f"  • Leave Period already exists for {company}")
         return
 
-    doc = frappe.get_doc(
-        {
-            "doctype": "Leave Period",
-            "leave_period_name": f"{company} - {fiscal_year.name}",
-            "company": company,
-            "from_date": fiscal_year.year_start_date,
-            "to_date": fiscal_year.year_end_date,
-            "is_active": 1,
-        }
-    )
+    doc = frappe.get_doc({
+        "doctype": "Leave Period",
+        "leave_period_name": f"{company} - {fiscal_year.name}",
+        "company": company,
+        "from_date": fiscal_year.year_start_date,
+        "to_date": fiscal_year.year_end_date,
+        "is_active": 1,
+    })
     doc.insert(ignore_permissions=True)
     print(f"  ✓ Created Leave Period for {company}")
 
@@ -235,38 +248,32 @@ def create_income_tax_slabs():
     companies = frappe.get_all("Company", pluck="name")
 
     for company in companies:
-        fiscal_year = frappe.get_cached_value("Company", company, "default_fiscal_year")
+        fiscal_year = _get_active_fiscal_year(company)
 
         if not fiscal_year:
-            print(f"  ✗ {company}: No Default Fiscal Year.")
+            print(f"  ✗ {company}: No active Fiscal Year could be found in the system.")
             continue
 
         _create_income_tax_slab(company, fiscal_year)
 
-
 def _create_income_tax_slab(company, fiscal_year):
     fy = frappe.get_doc("Fiscal Year", fiscal_year)
 
-    if frappe.db.exists(
-        "Income Tax Slab",
-        {
-            "company": company,
-            "effective_from": fy.year_start_date,
-        },
-    ):
+    if frappe.db.exists("Income Tax Slab", {
+        "company": company,
+        "effective_from": fy.year_start_date,
+    }):
         print(f"  • Income Tax Slab already exists for {company}")
         return
 
-    slab = frappe.get_doc(
-        {
-            "doctype": "Income Tax Slab",
-            "slab_name": f"{company} - PAYE - {fy.name}",
-            "company": company,
-            "disabled": 0,
-            "effective_from": fy.year_start_date,
-            "allow_tax_exemption": 1,
-        }
-    )
+    slab = frappe.get_doc({
+        "doctype": "Income Tax Slab",
+        "slab_name": f"{company} - PAYE - {fy.name}",
+        "company": company,
+        "disabled": 0,
+        "effective_from": fy.year_start_date,
+        "allow_tax_exemption": 1,
+    })
 
     slabs = [
         {"from_amount": 0, "to_amount": 61200, "percent_deduction": 0},
