@@ -199,22 +199,22 @@ def create_periods():
         _create_payroll_period(company, fy)
 
 def _create_payroll_period(company, fiscal_year):
-    if frappe.db.exists("Payroll Period", {
-        "company": company,
-        "payroll_frequency": "Monthly",
-        "start_date": fiscal_year.year_start_date,
-        "end_date": fiscal_year.year_end_date,
-    }):
-        print(f"  • Payroll Period already exists for {company}")
+    period_name = f"Payroll Period for {fiscal_year.name}"
+
+    if frappe.db.exists("Payroll Period", period_name):
+        print(f"  • Payroll Period already exists: {period_name}")
         return
 
     doc = frappe.get_doc({
         "doctype": "Payroll Period",
+        "name": period_name,
+        "payroll_period_name": period_name,
         "company": company,
         "payroll_frequency": "Monthly",
         "start_date": fiscal_year.year_start_date,
         "end_date": fiscal_year.year_end_date,
     })
+    
     doc.insert(ignore_permissions=True)
     print(f"  ✓ Created Payroll Period for {company}")
 
@@ -258,6 +258,7 @@ def create_income_tax_slabs():
 
 def _create_income_tax_slab(company, fiscal_year):
     fy = frappe.get_doc("Fiscal Year", fiscal_year)
+    slab_name = f"PAYE {fy.name}"
 
     if frappe.db.exists("Income Tax Slab", {
         "company": company,
@@ -268,7 +269,8 @@ def _create_income_tax_slab(company, fiscal_year):
 
     slab = frappe.get_doc({
         "doctype": "Income Tax Slab",
-        "slab_name": f"{company} - PAYE - {fy.name}",
+        "name": slab_name,           # <-- Added the required primary name field
+        "slab_name": slab_name,
         "company": company,
         "disabled": 0,
         "effective_from": fy.year_start_date,
