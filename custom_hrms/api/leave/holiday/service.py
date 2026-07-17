@@ -1,7 +1,6 @@
 from datetime import timedelta
 
 import frappe
-
 from frappe import _
 from frappe.utils import getdate
 
@@ -70,7 +69,6 @@ def list_holiday_lists_service() -> list:
 
     return result
 
-
 def update_holiday_list_service(
     name: str,
     payload: dict,
@@ -119,6 +117,7 @@ def rebuild_holidays(
     add_weekly_offs(
         holiday_list=holiday_list,
         weekly_offs=payload.get("weekly_offs", []),
+        payload_weekly_holidays=payload.get("weekly_holidays")
     )
 
     add_custom_holidays(
@@ -178,6 +177,7 @@ def validate_holidays(
 def add_weekly_offs(
     holiday_list,
     weekly_offs: list,
+    payload_weekly_holidays: list = None,
 ) -> None:
     existing_dates = set()
 
@@ -185,7 +185,6 @@ def add_weekly_offs(
         existing_dates.add(str(holiday.holiday_date))
 
     from_date = getdate(holiday_list.from_date)
-
     to_date = getdate(holiday_list.to_date)
 
     weekday_map = {
@@ -197,6 +196,14 @@ def add_weekly_offs(
         "Saturday": 5,
         "Sunday": 6,
     }
+    
+    weekdays_in_payload = set()
+    provided_weekly_dates = set()
+    
+    if payload_weekly_holidays is not None:
+        for wh in payload_weekly_holidays:
+            weekdays_in_payload.add(wh.get("description"))
+            provided_weekly_dates.add(str(wh.get("holiday_date")))
 
     current_date = from_date
 
@@ -204,7 +211,8 @@ def add_weekly_offs(
         current_weekday = current_date.weekday()
 
         for weekly_off in weekly_offs:
-            target_weekday = weekday_map.get(weekly_off.get("weekday"))
+            weekday_name = weekly_off.get("weekday")
+            target_weekday = weekday_map.get(weekday_name)
 
             if current_weekday != target_weekday:
                 continue
@@ -214,11 +222,15 @@ def add_weekly_offs(
             if current_date_str in existing_dates:
                 continue
 
+            if payload_weekly_holidays is not None:
+                if weekday_name in weekdays_in_payload and current_date_str not in provided_weekly_dates:
+                    continue
+
             holiday_list.append(
                 "holidays",
                 {
-                    "holiday_date": str(current_date),  # <-- Cast to string!
-                    "description": weekly_off.get("weekday"),
+                    "holiday_date": str(current_date),
+                    "description": weekday_name,
                     "weekly_off": 1,
                     "is_half_day": (1 if weekly_off.get("is_half_day", False) else 0),
                 },
@@ -262,27 +274,6 @@ def add_custom_holidays(
         )
 
         existing_dates.add(str(holiday_date))
-
-
-# def serialize_holiday_list(
-#     holiday_list,
-# ) -> dict:
-#     return {
-#         "name": holiday_list.name,
-#         "holiday_list_name": holiday_list.holiday_list_name,
-#         "from_date": holiday_list.from_date,
-#         "to_date": holiday_list.to_date,
-#         "country": holiday_list.country,
-#         "holidays": [
-#             {
-#                 "holiday_date": holiday.holiday_date,
-#                 "description": holiday.description,
-#                 "weekly_off": holiday.weekly_off,
-#                 "is_half_day": holiday.is_half_day,
-#             }
-#             for holiday in holiday_list.holidays
-#         ],
-#     }
 
 
 def serialize_holiday_list_summary(
@@ -343,6 +334,7 @@ def serialize_holiday_list(
 ) -> dict:
     weekly_offs = []
     holidays = []
+    weekly_holidays = []
 
     added_weekdays = set()
 
@@ -350,19 +342,27 @@ def serialize_holiday_list(
         if holiday.weekly_off:
             weekday = holiday.description
 
-            if weekday in added_weekdays:
-                continue
+            if weekday not in added_weekdays:
+                weekly_off = {
+                    "weekday": weekday,
+                }
 
-            weekly_off = {
-                "weekday": weekday,
+                if holiday.is_half_day:
+                    weekly_off["is_half_day"] = True
+
+                weekly_offs.append(weekly_off)
+
+                added_weekdays.add(weekday)
+
+            weekly_holiday_data = {
+                "holiday_date": holiday.holiday_date,
+                "description": holiday.description,
             }
 
             if holiday.is_half_day:
-                weekly_off["is_half_day"] = True
+                weekly_holiday_data["is_half_day"] = True
 
-            weekly_offs.append(weekly_off)
-
-            added_weekdays.add(weekday)
+            weekly_holidays.append(weekly_holiday_data)
 
         else:
             holiday_data = {
@@ -425,6 +425,7 @@ def serialize_holiday_list(
         "total_working_days": total_working_days,
 
         "weekly_offs": weekly_offs,
+        "weekly_holidays": weekly_holidays, 
         "holidays": holidays,
     }
 
