@@ -103,14 +103,46 @@ def create_holiday_list():
     _assign_holiday_list_to_companies(holiday_list.name)
 
 
+# def _assign_holiday_list_to_companies(holiday_list):
+#     companies = frappe.get_all("Company", pluck="name")
+    
+#     start_date, end_date = frappe.db.get_value(
+#         "Holiday List",
+#         holiday_list,
+#         ["from_date", "to_date"]
+#     )
+
+#     for company in companies:
+#         frappe.db.set_value(
+#             "Company",
+#             company,
+#             "default_holiday_list",
+#             holiday_list,
+#             update_modified=False,
+#         )
+
+#         if not frappe.db.exists(
+#             "Holiday List Assignment",
+#             {
+#                 "assigned_to": company,
+#                 "holiday_list": holiday_list,
+#             },
+#         ):
+#             frappe.get_doc(
+#                 {
+#                     "doctype": "Holiday List Assignment",
+#                     "assignment_based_on": "Company", 
+#                     "assigned_to": company,          
+#                     "holiday_list": holiday_list,
+#                     "from_date": start_date,         
+#                     "to_date": end_date
+#                 }
+#             ).insert(ignore_permissions=True)
+
+#         print(f"  ✓ Assigned Holiday List to Company: {company}")
+
 def _assign_holiday_list_to_companies(holiday_list):
     companies = frappe.get_all("Company", pluck="name")
-    
-    start_date, end_date = frappe.db.get_value(
-        "Holiday List",
-        holiday_list,
-        ["from_date", "to_date"]
-    )
 
     for company in companies:
         frappe.db.set_value(
@@ -121,26 +153,7 @@ def _assign_holiday_list_to_companies(holiday_list):
             update_modified=False,
         )
 
-        if not frappe.db.exists(
-            "Holiday List Assignment",
-            {
-                "assigned_to": company,
-                "holiday_list": holiday_list,
-            },
-        ):
-            frappe.get_doc(
-                {
-                    "doctype": "Holiday List Assignment",
-                    "assignment_based_on": "Company", 
-                    "assigned_to": company,          
-                    "holiday_list": holiday_list,
-                    "from_date": start_date,         
-                    "to_date": end_date
-                }
-            ).insert(ignore_permissions=True)
-
         print(f"  ✓ Assigned Holiday List to Company: {company}")
-
 
 # ==========================================
 # 4. PERIODS (PAYROLL & LEAVE)
