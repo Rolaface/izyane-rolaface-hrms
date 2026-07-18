@@ -230,64 +230,6 @@ def build_advanced_filters(raw_filters):
 
     return safe_filters
 
-
-# def assign_salary_structure(employee, salary_structure, company, from_date, base_salary, income_tax_slab=None):
-#     if not frappe.db.exists("Salary Structure", salary_structure):
-#         frappe.throw(f"Salary Structure '{salary_structure}' not found.")
-
-#     target_date = getdate(from_date)
-
-#     existing_assignment_name = frappe.db.get_value(
-#         "Salary Structure Assignment",
-#         {"employee": employee, "docstatus": 1},
-#         "name",
-#         order_by="from_date desc, creation desc",
-#     )
-
-#     if existing_assignment_name:
-#         old_assignment = frappe.get_doc("Salary Structure Assignment", existing_assignment_name)
-#         old_date = getdate(old_assignment.from_date)
-#         old_structure_name = old_assignment.salary_structure
-
-#         if old_date == target_date:
-#             old_assignment.cancel()
-#             frappe.delete_doc("Salary Structure Assignment", old_assignment.name, ignore_permissions=True)
-
-#             if str(old_structure_name).startswith(f"SS-{employee}-"):
-#                 try:
-#                     old_structure = frappe.get_doc("Salary Structure", old_structure_name)
-#                     if old_structure.docstatus == 1:
-#                         old_structure.cancel()
-#                     frappe.delete_doc("Salary Structure", old_structure_name, ignore_permissions=True)
-#                 except Exception:
-#                     frappe.db.set_value("Salary Structure", old_structure_name, "is_active", "No")
-#         else:
-#             old_assignment.cancel()
-
-#     assignment = frappe.new_doc("Salary Structure Assignment")
-#     assignment.employee = employee
-#     assignment.salary_structure = salary_structure
-#     assignment.company = company
-#     assignment.from_date = target_date
-#     assignment.base = flt(base_salary)
-
-#     selected_tax_slab = income_tax_slab
-#     if not selected_tax_slab:
-#         selected_tax_slab = frappe.db.get_value(
-#             "Income Tax Slab",
-#             {"company": company, "disabled": 0},
-#             "name",
-#             order_by="creation asc",
-#         )
-
-#     if selected_tax_slab:
-#         assignment.income_tax_slab = selected_tax_slab
-
-#     assignment.insert(ignore_permissions=True)
-#     assignment.submit()
-
-#     return assignment
-
 def assign_salary_structure(
     employee: str,
     salary_structure: str,
@@ -316,18 +258,19 @@ def assign_salary_structure(
 
         # --- CASE A: SAME-DATE REPLACEMENT (CORRECTION) ---
         if old_date == target_date:
-            # Cancel and remove the duplicate same-day assignment
+            # Replace an assignment created for the same effective date.
+            # This keeps only the latest correction for that date.
             old_assignment.cancel()
             frappe.delete_doc("Salary Structure Assignment", old_assignment.name, ignore_permissions=True)
 
-            # Only delete if it is an auto-generated employee-specific structure
+            # Remove the old employee-specific structure if it was auto-generated.
             if str(old_structure_name).startswith(f"SS-{employee}-") and old_structure_name != salary_structure:
                 _cleanup_custom_salary_structure(old_structure_name)
 
-        # --- CASE B: FUTURE/PAST DATE VERSIONING (PROMOTION/RAISE) ---
-        else:
-            # Standard Frappe versioning: simply cancel the old assignment
-            old_assignment.cancel()
+        # --- CASE B: FUTURE/PAST DATE VERSIONING (PROMOTION/RAISE) REMOVED SINCE WE WANT HISTORICAL RECORD ---
+        # else:
+        #     # Standard Frappe versioning: simply cancel the old assignment
+        #     old_assignment.cancel()
 
     # 3. Resolve Income Tax Slab
     selected_tax_slab = income_tax_slab or _get_default_tax_slab(company)
