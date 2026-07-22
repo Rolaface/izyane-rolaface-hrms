@@ -15,6 +15,7 @@ from .utils import (
     ALLOWED_SORT_FIELDS,
     build_advanced_filters,
 )
+from .employee_number_service import assert_employee_number_is_unique 
 
 def generate_custom_salary_structure(employee_id, company, components):
     if not components:
@@ -90,6 +91,8 @@ def create_employee(data):
         for field in ALLOWED_EMPLOYEE_FIELDS:
             if field in data and data.get(field) is not None:
                 employee.set(field, data.get(field))
+        if data.get("employee_number"): 
+             assert_employee_number_is_unique(data.get("employee_number"))
 
         if not employee.get("company"):
             employee.company = default_company
@@ -149,6 +152,10 @@ def create_employee(data):
 
 def update_employee(employee_id, data):
     employee = frappe.get_doc("Employee", employee_id)
+    if data.get("employee_number"):
+        assert_employee_number_is_unique(
+            data.get("employee_number"), exclude_employee_id=employee_id 
+        ) 
     for field in ALLOWED_EMPLOYEE_FIELDS:
         if field in data and data.get(field) is not None:
             employee.set(field, data.get(field))
