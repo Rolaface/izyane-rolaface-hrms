@@ -1,42 +1,98 @@
-import re
 import frappe
+from frappe.query_builder import DocType
 
-DEFAULT_EMPLOYEE_NUMBER_PREFIX = "EMP-"
-DEFAULT_EMPLOYEE_NUMBER_WIDTH = 5
-MAX_EMPLOYEE_NUMBER_LENGTH = 140  # matches Frappe's default Data field length
-
-_NUMERIC_SUFFIX_PATTERN = re.compile(r"^(.*?)(\d+)$")
+MAX_EMPLOYEE_NUMBER_LENGTH = 140
 
 
-def get_next_employee_number():
+def _resolve_prefix_and_digits(template: str) -> tuple[str, int]:
     """
-    Suggests the next employee number based on the highest existing
-    numeric suffix found in Employee.employee_number.
-
-    Suggestion only — no writes, no reservation, no interaction with
-    Frappe's naming series (Employee.name / HR-EMP-xxxxx).
+    Resolve the tabSeries key (prefix) and digit width Frappe's naming
+    engine would use for a naming_series template, without calling
+    parse_naming_series()/getseries() (which increment the counter).
     """
-    existing_numbers = frappe.get_all(
-        "Employee",
-        filters={"employee_number": ["is", "set"]},
-        pluck="employee_number",
-    )
+    if not template:
+        frappe.throw("Naming series template is empty.")
 
-    if not existing_numbers:
-        return _format_number(DEFAULT_EMPLOYEE_NUMBER_PREFIX, 1, DEFAULT_EMPLOYEE_NUMBER_WIDTH)
+    template = template.strip()
+    if "#" not in template:
+        template += ".#####"
 
-    best_prefix, best_width, best_number = _find_highest_employee_number(existing_numbers)
-    return _format_number(best_prefix, best_number + 1, best_width)
+    prefix = ""
+    digits = 5
+    counter_seen = False
+
+    for part in template.split("."):
+        if not part:
+            continue
+        if part.startswith("#"):
+            if not counter_seen:
+                digits = len(part)
+                counter_seen = True
+            continue
+        if not counter_seen:
+            prefix += part
+
+    return prefix, digits
+
+
+def _get_employee_naming_template(naming_series: str | None = None) -> str:
+    meta = frappe.get_meta("Employee")
+    naming_series_field = meta.get_field("naming_series")
+
+    if not naming_series_field or not naming_series_field.options:
+        frappe.throw("Employee naming series is not configured.")
+
+    options = [o.strip() for o in naming_series_field.options.split("\n") if o.strip()]
+    if not options:
+        frappe.throw("Employee naming series options are empty.")
+
+    if naming_series:
+        naming_series = naming_series.strip()
+        if naming_series not in options:
+            frappe.throw(f"'{naming_series}' is not a configured Employee naming series.")
+        return naming_series
+
+    return options[0]
+
+
+def get_next_employee_number(naming_series: str | None = None) -> str:
+    """
+    Preview the next Employee Number from Frappe's own naming series
+    counter (tabSeries.current) — read-only, no increment, no scan,
+    no regex.
+    """
+    template = _get_employee_naming_template(naming_series)
+    prefix, digits = _resolve_prefix_and_digits(template)
+
+    series = DocType("Series")
+    result = (
+        frappe.qb.from_(series)
+        .where(series.name == prefix)
+        .select(series.current)
+    ).run()
+
+    current_value = result[0][0] if result else 0
+    next_value = (current_value or 0) + 1
+
+    return f"{prefix}{str(next_value).zfill(digits)}"
+
+
+def _sanitize_employee_number(employee_number):
+    if not employee_number or not str(employee_number).strip():
+        frappe.throw("Employee Number is required.")
+
+    employee_number = str(employee_number).strip()
+
+    if len(employee_number) > MAX_EMPLOYEE_NUMBER_LENGTH:
+        frappe.throw(f"Employee Number must not exceed {MAX_EMPLOYEE_NUMBER_LENGTH} characters.")
+
+    return employee_number
 
 
 def check_employee_number_availability(employee_number, exclude_employee_id=None):
     """
     Live check for whether employee_number is already taken.
-    Intended for on-blur/on-type validation before Save, so the user
-    gets instant feedback instead of discovering the clash at submit time.
-
-    exclude_employee_id: current employee's id on an edit screen, so the
-    record being edited doesn't flag itself as a duplicate.
+    Single indexed lookup — no scan, no regex.
     """
     employee_number = _sanitize_employee_number(employee_number)
 
@@ -56,10 +112,8 @@ def check_employee_number_availability(employee_number, exclude_employee_id=None
 
 def assert_employee_number_is_unique(employee_number, exclude_employee_id=None):
     """
-    Hard save-time guard used inside create_employee / update_employee.
-    Raises frappe.ValidationError on clash. This is the real guarantee;
-    check_employee_number_availability is only a UX convenience and can
-    race under concurrency.
+    Hard save-time guard. This is the real guarantee; the availability
+    check above is UX-only and can race under concurrency.
     """
     result = check_employee_number_availability(employee_number, exclude_employee_id)
     if not result["is_available"]:
@@ -67,45 +121,3 @@ def assert_employee_number_is_unique(employee_number, exclude_employee_id=None):
             f"Employee Number '{result['employee_number']}' is already in use "
             f"by {result['existing_employee_id']}."
         )
-
-
-def _sanitize_employee_number(employee_number):
-    if not employee_number or not str(employee_number).strip():
-        frappe.throw("Employee Number is required.")
-
-    employee_number = str(employee_number).strip()
-
-    if len(employee_number) > MAX_EMPLOYEE_NUMBER_LENGTH:
-        frappe.throw(f"Employee Number must not exceed {MAX_EMPLOYEE_NUMBER_LENGTH} characters.")
-
-    return employee_number
-
-
-def _find_highest_employee_number(existing_numbers):
-    best_prefix = DEFAULT_EMPLOYEE_NUMBER_PREFIX
-    best_width = DEFAULT_EMPLOYEE_NUMBER_WIDTH
-    best_number = 0
-
-    for value in existing_numbers:
-        if not value:
-            continue
-
-        match = _NUMERIC_SUFFIX_PATTERN.match(str(value).strip())
-        if not match:
-            # Legacy/manually entered values without a numeric suffix
-            # are skipped rather than breaking the whole suggestion.
-            continue
-
-        prefix, digits = match.group(1), match.group(2)
-        numeric_value = int(digits)
-
-        if numeric_value > best_number:
-            best_number = numeric_value
-            best_prefix = prefix
-            best_width = len(digits)
-
-    return best_prefix, best_width, best_number
-
-
-def _format_number(prefix, number, width):
-    return f"{prefix}{str(number).zfill(width)}"
