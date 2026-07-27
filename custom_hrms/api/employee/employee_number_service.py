@@ -1,7 +1,10 @@
 import frappe
 from frappe.query_builder import DocType
 
-MAX_EMPLOYEE_NUMBER_LENGTH = 140
+def _get_employee_number_max_length():
+    meta = frappe.get_meta("Employee")
+    field = meta.get_field("employee_number")
+    return int(field.length) if field and field.length else 140
 
 
 def _resolve_prefix_and_digits(template: str) -> tuple[str, int]:
@@ -83,41 +86,63 @@ def _sanitize_employee_number(employee_number):
 
     employee_number = str(employee_number).strip()
 
-    if len(employee_number) > MAX_EMPLOYEE_NUMBER_LENGTH:
-        frappe.throw(f"Employee Number must not exceed {MAX_EMPLOYEE_NUMBER_LENGTH} characters.")
+    max_length = _get_employee_number_max_length()
+
+    if len(employee_number) > max_length:
+        frappe.throw(
+            f"Employee Number must not exceed {max_length} characters."
+        )
 
     return employee_number
 
 
 def check_employee_number_availability(employee_number, exclude_employee_id=None):
     """
-    Live check for whether employee_number is already taken.
-    Single indexed lookup — no scan, no regex.
+    Live check for whether employee_number or Employee ID (name) is already taken.
     """
     employee_number = _sanitize_employee_number(employee_number)
 
-    filters = {"employee_number": employee_number}
+    employee_filters = {"employee_number": employee_number}
     if exclude_employee_id:
-        filters["name"] = ["!=", exclude_employee_id]
+        employee_filters["name"] = ["!=", exclude_employee_id]
 
-    existing_employee_id = frappe.db.get_value("Employee", filters, "name")
-    is_available = not existing_employee_id
+    existing_employee = frappe.db.get_value(
+        "Employee",
+        employee_filters,
+        ["name", "employee_number"],
+        as_dict=True,
+    )
+
+    existing_by_name = frappe.db.exists("Employee", employee_number)
+
+    if exclude_employee_id and existing_by_name == exclude_employee_id:
+        existing_by_name = None
+
+    existing_employee_id = (
+        existing_employee["name"] if existing_employee else existing_by_name
+    )
 
     return {
         "employee_number": employee_number,
-        "is_available": is_available,
-        "existing_employee_id": existing_employee_id if not is_available else None,
+        "is_available": existing_employee_id is None,
+        "existing_employee_id": existing_employee_id,
+        "existing_employee_number": (
+            existing_employee["employee_number"] if existing_employee else None
+        ),
     }
-
 
 def assert_employee_number_is_unique(employee_number, exclude_employee_id=None):
     """
     Hard save-time guard. This is the real guarantee; the availability
     check above is UX-only and can race under concurrency.
     """
-    result = check_employee_number_availability(employee_number, exclude_employee_id)
+    result = check_employee_number_availability(
+        employee_number,
+        exclude_employee_id,
+    )
+
     if not result["is_available"]:
         frappe.throw(
-            f"Employee Number '{result['employee_number']}' is already in use "
-            f"by {result['existing_employee_id']}."
+            f"Employee Number '{result['employee_number']}' is already assigned to Employee ID '{result['existing_employee_id']}'."
         )
+        
