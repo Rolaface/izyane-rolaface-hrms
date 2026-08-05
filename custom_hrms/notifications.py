@@ -104,3 +104,45 @@ def notify_holiday_update(doc, method):
 	subject = "New holiday(s) added to your holiday list"
 	for emp in employees:
 		create_notification(emp.user_id, subject, "Holiday List", doc.name)
+
+
+@frappe.whitelist()
+def get_employee_notifications(limit=20):
+	user = frappe.session.user
+
+	notifications = frappe.get_all(
+		"Notification Log",
+		filters={"for_user": user},
+		fields=["name", "subject", "document_type", "document_name",
+				"read", "creation", "type"],
+		order_by="creation desc",
+		limit=limit
+	)
+
+	unread_count = frappe.db.count("Notification Log", {
+		"for_user": user,
+		"read": 0
+	})
+
+	return {
+		"notifications": notifications,
+		"unread_count": unread_count
+	}
+
+
+@frappe.whitelist()
+def mark_as_read(notification_name):
+	frappe.db.set_value("Notification Log", notification_name, "read", 1)
+	frappe.db.commit()
+	return {"success": True}
+
+
+@frappe.whitelist()
+def mark_all_as_read():
+	frappe.db.sql("""
+		UPDATE `tabNotification Log`
+		SET `read` = 1
+		WHERE for_user = %s AND `read` = 0
+	""", (frappe.session.user,))
+	frappe.db.commit()
+	return {"success": True}
