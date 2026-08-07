@@ -281,6 +281,7 @@ def get_expense_claims(
                 "total_claimed_amount": row.total_claimed_amount,
                 "clearance_date": row.clearance_date,
                 "expense_type": expense_data.get("expense_type"),
+                "expense_date": expense_data.get("expense_date"),
                 "total_amount_reimbursed": row.total_amount_reimbursed,
             }
         )

@@ -2,6 +2,7 @@ import json
 import frappe
 from frappe import _
 import math
+from frappe.utils import getdate, date_diff  # <--- NEW IMPORTS REQUIRED
 from .utils import PAYROLL_ENTRY_FIELDS, SALARY_SLIP_FIELDS, SALARY_DETAIL_FIELDS
 
 from hrms.payroll.doctype.payroll_entry.payroll_entry import (
@@ -252,6 +253,13 @@ def calculate_payroll_entry_payable(payroll_entry_id):
 
             slip_dict["status"] = slip_status
             slip_dict["net_payable"] = net_payable
+            
+            slip_dict["leaves_taken_in_payroll_period"] = get_employee_leaves_in_period(
+                employee=slip_doc.employee, 
+                start_date=slip_doc.start_date, 
+                end_date=slip_doc.end_date
+            )
+            
             breakdown.append(slip_dict)
 
         return {
@@ -375,8 +383,17 @@ def generate_salary_slip_preview(
             slip.exchange_rate = exchange_rate
 
         slip.get_emp_and_working_day_details()
+        
+        # Determine Payroll Period to ensure YTD calculation knows when the year started
+        if hasattr(slip, "set_payroll_period"):
+            slip.set_payroll_period()
+            
         slip.process_salary_structure()
         slip.calculate_net_pay()
+
+        # Compute YTD since we aren't saving the document
+        if hasattr(slip, "compute_year_to_date"):
+            slip.compute_year_to_date()
 
         net_payable = slip.rounded_total or slip.net_pay or 0.0
 
@@ -397,6 +414,12 @@ def generate_salary_slip_preview(
         slip_dict["gross_pay"] = slip.gross_pay or 0.0
         slip_dict["total_deduction"] = slip.total_deduction or 0.0
         slip_dict["error_message"] = None
+        
+        slip_dict["leaves_taken_in_payroll_period"] = get_employee_leaves_in_period(
+            employee=employee, 
+            start_date=start_date, 
+            end_date=end_date
+        )
 
         return slip_dict
 
@@ -414,6 +437,7 @@ def generate_salary_slip_preview(
             "total_deduction": 0.0,
             "earnings": [],
             "deductions": [],
+            "leaves_taken_in_payroll_period": 0.0
         }
 
 
@@ -516,20 +540,132 @@ def get_payroll_entry_details(payroll_entry_id):
     breakdown_list = financial_summary.get("employee_breakdown", [])
     breakdown_map = {b["employee"]: b for b in breakdown_list}
 
+    employee_ids = [
+        emp.get("employee")
+        for emp in raw_doc.get("employees", [])
+        if emp.get("employee")
+    ]
+
+    employees = frappe.get_all(
+        "Employee",
+        filters={"name": ["in", employee_ids]},
+        fields=["name", "gender"],
+    )
+
+    gender_map = {
+        emp["name"]: emp["gender"]
+        for emp in employees
+    }
+
+    department_ids = list(set([
+        emp.get("department")
+        for emp in raw_doc.get("employees", [])
+        if emp.get("department")
+    ]))
+
+    department_map = {}
+    if department_ids:
+        departments = frappe.get_all(
+            "Department",
+            filters={"name": ["in", department_ids]},
+            fields=["name", "department_name"]
+        )
+        department_map = {d["name"]: d["department_name"] for d in departments}
+
     doc_dict["employees"] = []
-    if "employees" in raw_doc:
-        for emp in raw_doc["employees"]:
-            emp_id = emp.get("employee")
-            clean_emp = {
-                "employee": emp_id,
-                "employee_name": emp.get("employee_name"),
-                "department": emp.get("department"),
-                "designation": emp.get("designation"),
-                "salary_slip_details": breakdown_map.get(emp_id),
-            }
-            doc_dict["employees"].append(clean_emp)
+
+    for emp in raw_doc.get("employees", []):
+        emp_id = emp.get("employee")
+        dept_id = emp.get("department")
+
+        clean_emp = {
+            "employee": emp_id,
+            "employee_name": emp.get("employee_name"),
+            "department_name": department_map.get(dept_id),
+            "designation": emp.get("designation"),
+            "gender": gender_map.get(emp_id),
+            "salary_slip_details": breakdown_map.get(emp_id),
+        }
+
+        doc_dict["employees"].append(clean_emp)
 
     if financial_summary.get("last_error"):
         doc_dict["last_error"] = financial_summary.get("last_error")
 
     return doc_dict
+
+def delete_payroll_entry_and_links(payroll_entry_id: str) -> dict:
+
+    doc = frappe.get_doc("Payroll Entry", payroll_entry_id)
+
+    if doc.docstatus != 2:
+        return {
+            "status": "error",
+            "message": _("Only Cancelled Payroll Entries can be deleted.")
+        }
+
+    linked_jes = set()
+    
+    if doc.get("bank_entry"):
+        linked_jes.add(doc.bank_entry)
+
+    je_accounts = frappe.get_all(
+        "Journal Entry Account",
+        filters={
+            "reference_type": "Payroll Entry",
+            "reference_name": payroll_entry_id
+        },
+        pluck="parent"
+    )
+    linked_jes.update(je_accounts)
+
+    for je_name in linked_jes:
+        if frappe.db.exists("Journal Entry", je_name):
+            je_status = frappe.db.get_value("Journal Entry", je_name, "docstatus")
+            if je_status in [0, 2]:
+                frappe.delete_doc("Journal Entry", je_name, ignore_permissions=True)
+
+    salary_slips = frappe.get_all(
+        "Salary Slip", 
+        filters={"payroll_entry": payroll_entry_id}, 
+        pluck="name"
+    )
+    for slip_name in salary_slips:
+        slip_status = frappe.db.get_value("Salary Slip", slip_name, "docstatus")
+        if slip_status in [0, 2]:
+            frappe.delete_doc("Salary Slip", slip_name, ignore_permissions=True)
+
+    frappe.delete_doc("Payroll Entry", payroll_entry_id, ignore_permissions=True)
+
+    return {"status": "success"}
+
+def get_employee_leaves_in_period(employee: str, start_date: str, end_date: str) -> float:
+    leave_apps = frappe.get_all(
+        "Leave Application",
+        filters={
+            "employee": employee,
+            "docstatus": 1,
+            "status": "Approved",
+            "from_date": ["<=", end_date],
+            "to_date": [">=", start_date]
+        },
+        fields=["from_date", "to_date", "half_day", "half_day_date"]
+    )
+    
+    total_leave_days = 0.0
+    
+    for leave in leave_apps:
+        actual_start = max(getdate(leave.from_date), getdate(start_date))
+        actual_end = min(getdate(leave.to_date), getdate(end_date))
+        
+        days = date_diff(actual_end, actual_start) + 1
+        
+        if leave.half_day and leave.half_day_date:
+            half_date = getdate(leave.half_day_date)
+            if actual_start <= half_date <= actual_end:
+                days -= 0.5
+                
+        if days > 0:
+            total_leave_days += days
+            
+    return total_leave_days

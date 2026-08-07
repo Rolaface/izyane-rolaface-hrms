@@ -322,3 +322,70 @@ def get_payroll_entry(id=None):
             status_code=500,
             http_status=500,
         )
+
+@frappe.whitelist(allow_guest=False, methods=["DELETE"])
+def delete_payroll_entry(id=None):
+    try:
+        payroll_entry_id = (
+            id or frappe.request.args.get("id") or frappe.local.form_dict.get("id")
+        )
+
+        if not payroll_entry_id:
+            return send_response(
+                status="fail",
+                message="'id' is required.",
+                status_code=400,
+                http_status=400,
+            )
+
+        if not frappe.db.exists("Payroll Entry", payroll_entry_id):
+            return send_response(
+                status="fail",
+                message="Payroll Entry not found.",
+                status_code=404,
+                http_status=404,
+            )
+
+        result = service.delete_payroll_entry_and_links(payroll_entry_id)
+
+        if result.get("status") == "error":
+            frappe.db.rollback()
+            return send_response(
+                status="error",
+                message=result.get("message"),
+                status_code=400,
+                http_status=400,
+            )
+
+        frappe.db.commit()
+
+        return send_response(
+            status="success",
+            message="Payroll Entry and all linked records were successfully deleted.",
+            status_code=200,
+            http_status=200,
+        )
+
+    except frappe.LinkExistsError as e:
+        frappe.db.rollback()
+        return send_response(
+            status="fail",
+            message=f"Cannot delete due to linked records: {str(e)}",
+            status_code=409,
+            http_status=409,
+        )
+
+    except Exception as e:
+        frappe.db.rollback()
+        frappe.log_error(
+            frappe.get_traceback(),
+            "Delete Payroll Entry API Error",
+        )
+
+        return send_response(
+            status="error",
+            message="Failed to delete payroll entry.",
+            data={"error": str(e)},
+            status_code=500,
+            http_status=500,
+        )

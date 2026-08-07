@@ -15,6 +15,71 @@ from .utils import (
     ALLOWED_SORT_FIELDS,
     build_advanced_filters,
 )
+from .employee_number_service import assert_employee_number_is_unique 
+
+def generate_custom_salary_structure(employee_id, company, components):
+    if not components:
+        return None
+
+    timestamp = frappe.utils.now().replace(" ", "").replace(":", "").replace("-", "")
+    ss_name = f"SS-{employee_id}-{timestamp}"
+
+    ss = frappe.new_doc("Salary Structure")
+    ss.name = ss_name
+    ss.employee = employee_id
+    ss.company = company
+    ss.is_active = "Yes"
+    ss.docstatus = 0
+
+    for comp in components:
+        comp_name = comp.get("component")
+        if not comp_name:
+            continue
+
+        comp_meta = frappe.db.get_value(
+            "Salary Component",
+            comp_name,
+            ["type", "amount_based_on_formula", "formula", "condition"],
+            as_dict=True,
+        )
+
+        if not comp_meta:
+            continue
+
+        if comp_meta.type == "Earning":
+            row = ss.append("earnings", {})
+        elif comp_meta.type == "Deduction":
+            row = ss.append("deductions", {})
+        else:
+            continue
+
+        row.salary_component = comp_name
+
+        if "formula" in comp and comp.get("formula") is not None:
+            row.amount_based_on_formula = 1
+            row.formula = comp.get("formula")
+            row.amount = 0
+        elif "amount" in comp and comp.get("amount") is not None:
+            row.amount_based_on_formula = 0
+            row.amount = flt(comp.get("amount"))
+            row.formula = None
+        else:
+            row.amount_based_on_formula = comp_meta.amount_based_on_formula or 0
+            if row.amount_based_on_formula:
+                row.formula = comp_meta.formula
+                row.amount = 0
+            else:
+                row.amount = 0
+                row.formula = None
+
+        if "condition" in comp and comp.get("condition") is not None:
+            row.condition = comp.get("condition")
+        elif comp_meta.condition:
+            row.condition = comp_meta.condition
+
+    ss.insert(ignore_permissions=True)
+    ss.submit()
+    return ss.name
 
 
 def create_employee(data):
@@ -23,41 +88,49 @@ def create_employee(data):
 
     try:
         employee = frappe.new_doc("Employee")
-
         for field in ALLOWED_EMPLOYEE_FIELDS:
             if field in data and data.get(field) is not None:
                 employee.set(field, data.get(field))
+        if data.get("employee_number"): 
+             assert_employee_number_is_unique(data.get("employee_number"))
 
         if not employee.get("company"):
             employee.company = default_company
-
         if not employee.get("date_of_joining"):
             employee.date_of_joining = current_date
 
         current_company = employee.get("company")
 
         if not employee.get("holiday_list") and current_company:
-            default_holiday = frappe.db.get_value(
-                "Company", current_company, "default_holiday_list"
-            )
+            default_holiday = frappe.db.get_value("Company", current_company, "default_holiday_list")
             if default_holiday:
                 employee.holiday_list = default_holiday
 
-        ext_details_data = {}
-        for ext_field in ALLOWED_EXTENDED_FIELDS:
-            if ext_field in data and data.get(ext_field) is not None:
-                ext_details_data[ext_field] = data.get(ext_field)
-
+        ext_details_data = {
+            ext_field: data.get(ext_field)
+            for ext_field in ALLOWED_EXTENDED_FIELDS
+            if ext_field in data and data.get(ext_field) is not None
+        }
         if ext_details_data:
             child_row = employee.append("custom_extended_details", {})
             child_row.update(ext_details_data)
 
         employee.insert(ignore_permissions=True)
 
-        if data.get("salary_structure"):
+        final_salary_structure = data.get("salary_structure")
+        custom_components = data.get("custom_salary_components")
+
+        if custom_components and isinstance(custom_components, list) and len(custom_components) > 0:
+            final_salary_structure = generate_custom_salary_structure(
+                employee_id=employee.name,
+                company=current_company,
+                components=custom_components,
+            )
+
+        if final_salary_structure:
             assign_salary_structure(
                 employee=employee.name,
-                salary_structure=data.get("salary_structure"),
+                salary_structure=final_salary_structure,
                 company=current_company,
                 from_date=employee.get("date_of_joining"),
                 base_salary=data.get("base_salary", 0),
@@ -68,11 +141,7 @@ def create_employee(data):
             assign_leave_policy(employee.name, data.get("leave_policy"))
 
         if employee.get("holiday_list"):
-            assign_holiday_list(
-                employee.name,
-                employee.get("holiday_list"),
-                employee.get("date_of_joining"),
-            )
+            assign_holiday_list(employee.name, employee.get("holiday_list"), employee.get("date_of_joining"))
 
         return get_employee_by_id(employee.name)
 
@@ -83,23 +152,39 @@ def create_employee(data):
 
 def update_employee(employee_id, data):
     employee = frappe.get_doc("Employee", employee_id)
+    if data.get("employee_number"):
+        assert_employee_number_is_unique(
+            data.get("employee_number"), exclude_employee_id=employee_id 
+        ) 
     for field in ALLOWED_EMPLOYEE_FIELDS:
         if field in data and data.get(field) is not None:
             employee.set(field, data.get(field))
 
     if any(field in data for field in ALLOWED_EXTENDED_FIELDS):
-        ext_details_data = {}
-        for ext_field in ALLOWED_EXTENDED_FIELDS:
-            if ext_field in data and data.get(ext_field) is not None:
-                ext_details_data[ext_field] = data.get(ext_field)
-
+        ext_details_data = {
+            ext_field: data.get(ext_field)
+            for ext_field in ALLOWED_EXTENDED_FIELDS
+            if ext_field in data and data.get(ext_field) is not None
+        }
         employee.set("custom_extended_details", [])
         if ext_details_data:
             employee.append("custom_extended_details", ext_details_data)
 
     employee.save(ignore_permissions=True)
 
-    if any(k in data for k in ["salary_structure", "base_salary", "income_tax_slab"]):
+    needs_salary_update = False
+    new_structure = data.get("salary_structure")
+    custom_components = data.get("custom_salary_components")
+
+    if custom_components and isinstance(custom_components, list) and len(custom_components) > 0:
+        new_structure = generate_custom_salary_structure(
+            employee_id=employee.name,
+            company=employee.company,
+            components=custom_components,
+        )
+        needs_salary_update = True
+
+    if new_structure or data.get("base_salary") is not None or data.get("income_tax_slab") is not None:
         current_assignment = frappe.db.get_value(
             "Salary Structure Assignment",
             {"employee": employee_id, "docstatus": 1},
@@ -108,30 +193,34 @@ def update_employee(employee_id, data):
             order_by="from_date desc, creation desc",
         )
 
-        if current_assignment:
-            new_structure = data.get("salary_structure", current_assignment.get("salary_structure"))
-            new_base = data.get("base_salary", current_assignment.get("base"))
-            new_slab = data.get("income_tax_slab", current_assignment.get("income_tax_slab"))
+        effective_date = data.get("effective_date") or today()
 
-            if (new_structure != current_assignment.get("salary_structure") or 
-                flt(new_base) != flt(current_assignment.get("base")) or 
-                new_slab != current_assignment.get("income_tax_slab")):
-                
+        if current_assignment:
+            eval_structure = new_structure or current_assignment.get("salary_structure")
+            eval_base = data.get("base_salary", current_assignment.get("base"))
+            eval_slab = data.get("income_tax_slab", current_assignment.get("income_tax_slab"))
+
+            if (
+                needs_salary_update
+                or eval_structure != current_assignment.get("salary_structure")
+                or flt(eval_base) != flt(current_assignment.get("base"))
+                or eval_slab != current_assignment.get("income_tax_slab")
+            ):
+                assign_salary_structure(
+                    employee=employee.name,
+                    salary_structure=eval_structure,
+                    company=employee.company,
+                    from_date=effective_date,
+                    base_salary=eval_base,
+                    income_tax_slab=eval_slab,
+                )
+        else:
+            if new_structure:
                 assign_salary_structure(
                     employee=employee.name,
                     salary_structure=new_structure,
                     company=employee.company,
-                    from_date=data.get("effective_date") or today(),
-                    base_salary=new_base,
-                    income_tax_slab=new_slab,
-                )
-        else:
-            if data.get("salary_structure"):
-                assign_salary_structure(
-                    employee=employee.name,
-                    salary_structure=data.get("salary_structure"),
-                    company=employee.company,
-                    from_date=data.get("effective_date") or today(),
+                    from_date=effective_date,
                     base_salary=data.get("base_salary", 0),
                     income_tax_slab=data.get("income_tax_slab"),
                 )
@@ -141,45 +230,53 @@ def update_employee(employee_id, data):
             "Leave Policy Assignment",
             {"employee": employee_id, "docstatus": 1},
             "leave_policy",
-            order_by="effective_from desc, creation desc"
+            order_by="effective_from desc, creation desc",
         )
         if current_leave != data.get("leave_policy"):
             assign_leave_policy(employee.name, data.get("leave_policy"))
 
     if data.get("holiday_list"):
         current_holiday = frappe.db.get_value(
-            "Holiday List Assignment",
-            {"employee": employee_id, "docstatus": 1},
-            "holiday_list",
+            "Holiday List Assignment", {"employee": employee_id, "docstatus": 1}, "holiday_list"
         )
         if current_holiday != data.get("holiday_list"):
-            assign_holiday_list(
-                employee.name,
-                data.get("holiday_list"),
-                data.get("effective_date") or today(),
-            )
+            assign_holiday_list(employee.name, data.get("holiday_list"), data.get("effective_date") or today())
 
     return get_employee_by_id(employee.name)
 
 
 def get_employee_by_id(employee_id):
-    employee_data = frappe.db.get_value(
-        "Employee", employee_id, RETURN_EMPLOYEE_FIELDS_GET_BY_ID, as_dict=True
-    )
+    employee_data = frappe.db.get_value("Employee", employee_id, RETURN_EMPLOYEE_FIELDS_GET_BY_ID, as_dict=True)
 
     salary_assignment = frappe.db.get_value(
         "Salary Structure Assignment",
         {"employee": employee_id, "docstatus": 1},
         ["salary_structure", "income_tax_slab", "base", "from_date"],
         as_dict=True,
-        order_by="from_date desc, creation desc", # Ensure we get the latest assignment if multiple exist should be from date but because of the way we are assigning it can be multiple with same from date so using creation date to get the latest one
+        order_by="from_date desc, creation desc",
     )
 
+    employee_data["custom_salary_components"] = []
+
     if salary_assignment:
-        employee_data["salary_structure"] = salary_assignment.get("salary_structure")
+        ss_name = salary_assignment.get("salary_structure")
+        employee_data["salary_structure"] = ss_name
         employee_data["income_tax_slab"] = salary_assignment.get("income_tax_slab")
         employee_data["base_salary"] = salary_assignment.get("base")
         employee_data["effective_date"] = salary_assignment.get("from_date")
+
+        if str(ss_name).startswith(f"SS-{employee_id}-"):
+            ss_doc = frappe.get_doc("Salary Structure", ss_name)
+            components_list = [
+                {
+                    "component": row.salary_component,
+                    "amount": row.amount if not row.amount_based_on_formula else None,
+                    "formula": row.formula if row.amount_based_on_formula else None,
+                    "condition": row.condition,
+                }
+                for row in ss_doc.get("earnings") + ss_doc.get("deductions")
+            ]
+            employee_data["custom_salary_components"] = components_list
     else:
         employee_data["salary_structure"] = None
         employee_data["income_tax_slab"] = None
@@ -198,7 +295,6 @@ def get_employee_by_id(employee_id):
         filters={"parent": employee_id, "parenttype": "Employee"},
         fields=ALLOWED_EXTENDED_FIELDS,
     )
-
     if extended_details:
         for key, value in extended_details[0].items():
             employee_data[key] = value
@@ -207,20 +303,14 @@ def get_employee_by_id(employee_id):
             employee_data[field] = None
 
     if employee_data.get("leave_approver"):
-        employee_data["leave_approver_name"] = frappe.db.get_value(
-            "User",
-            employee_data.get("leave_approver"),
-            "full_name"
-        )
+        employee_data["leave_approver_name"] = frappe.db.get_value("User", employee_data.get("leave_approver"), "full_name")
     else:
         employee_data["leave_approver_name"] = None
 
     return employee_data
 
 
-def get_employees(
-    filters, page, page_size, search, sort_by="creation", sort_order="desc"
-):
+def get_employees(filters, page, page_size, search, sort_by="creation", sort_order="desc"):
     start = (page - 1) * page_size
 
     or_filters = []
@@ -294,10 +384,26 @@ def get_employees(
 
 
 def delete_employee(employee_id):
+    generated_structures = frappe.get_all("Salary Structure", filters={"employee": employee_id, "name": ["like", f"SS-{employee_id}-%"]})
+    
     frappe.db.delete("Salary Structure Assignment", {"employee": employee_id})
     frappe.db.delete("Leave Policy Assignment", {"employee": employee_id})
     frappe.delete_doc("Employee", employee_id, ignore_permissions=True)
+    
+    for structure in generated_structures:
+        frappe.delete_doc("Salary Structure", structure.name, ignore_permissions=True)
 
+
+def update_employee_status(employee_id, status):
+    employee = frappe.get_doc("Employee", employee_id)
+    employee.status = status
+    employee.save(ignore_permissions=True)
+
+    return {
+        "id": employee.name,
+        "status": employee.status,
+        "employee_name": employee.employee_name,
+    }
 
 def update_employee_status(employee_id, status):
     employee = frappe.get_doc("Employee", employee_id)
