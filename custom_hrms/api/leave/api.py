@@ -111,3 +111,54 @@ def custom_employee_details(employee_id=None):
             status_code=500,
             http_status=500,
         )
+@frappe.whitelist(allow_guest=False, methods=["GET"])
+def get_all_employee_leave_details(page=1, page_size=20):
+    try:
+        page = int(page)
+        page_size = int(page_size)
+
+        filters = frappe._dict({
+            "employee": frappe.request.args.get("employee"),
+            "department": frappe.request.args.get("department"),
+            "status": frappe.request.args.get("status"),
+        })
+
+        data, total, total_pages = service.get_all_employee_leave_details(
+            filters=filters,
+            page=page,
+            page_size=page_size,
+        )
+
+        response_data = {
+            "employees": data,
+            "pagination": {
+                "page": page,
+                "page_size": page_size,
+                "total": total,
+                "total_pages": total_pages,
+                "has_next": page < total_pages,
+                "has_prev": page > 1,
+            },
+        }
+
+        return send_response(
+            status="success",
+            message="Employee leave balances retrieved successfully.",
+            data=response_data,
+            status_code=200,
+            http_status=200,
+        )
+
+    except Exception as e:
+        frappe.log_error(
+            frappe.get_traceback(),
+            "Get All Employee Leave Details API Error",
+        )
+
+        return send_response(
+            status="error",
+            message=f"Internal Server Error: {str(e)}",
+            data=None,
+            status_code=500,
+            http_status=500,
+        )
