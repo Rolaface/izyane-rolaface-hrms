@@ -181,27 +181,27 @@ def get_expense_claims(
             "owner",
             "total_amount_reimbursed"
         ]
-
-    expense_claims = frappe.call(
-                                 frappe.client.get_list, 
-                                 "Expense Claim", 
-                                 fields=fields, 
-                                 filters=filters,
-                                 or_filters=or_filters, 
-                                 order_by=f"{sort_by} {sort_order}", 
-                                 limit_start=start, 
-                                 limit_page_length=page_size
-                                )
-
-    # expense_claims = frappe.get_all(
-    #     "Expense Claim",
-    #     filters=filters,
-    #     or_filters = or_filters,
-    #     fields=fields,
-    #     order_by=f"{sort_by} {sort_order}",
-    #     limit_start=start,
-    #     limit_page_length=page_size,
-    # )
+    if not bool(frappe.conf.get("by_pass_expense_claim_approval")):
+        expense_claims = frappe.call(
+                                    frappe.client.get_list, 
+                                    "Expense Claim", 
+                                    fields=fields, 
+                                    filters=filters,
+                                    or_filters=or_filters, 
+                                    order_by=f"{sort_by} {sort_order}", 
+                                    limit_start=start, 
+                                    limit_page_length=page_size
+                                    )
+    else:
+        expense_claims = frappe.get_all(
+            "Expense Claim",
+            filters=filters,
+            or_filters = or_filters,
+            fields=fields,
+            order_by=f"{sort_by} {sort_order}",
+            limit_start=start,
+            limit_page_length=page_size,
+        )
 
     claim_names = [d.name for d in expense_claims]
 
