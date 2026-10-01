@@ -1,9 +1,10 @@
 import frappe
 
 def before_validate(doc, method):
+    frappe.log_error(f"doc-->: {doc.company} <--Before Validate Hook")
 
     default_cost_center = frappe.db.get_value("Company", doc.company, "cost_center")
-    frappe.log_error(f"Default Cost Center: {default_cost_center}", "Before Validate Hook")
+    frappe.log_error(f"Default Cost Center: {default_cost_center} Before Validate Hook")
     if doc.expenses:
         for expense in doc.expenses:
             if not expense.cost_center:
