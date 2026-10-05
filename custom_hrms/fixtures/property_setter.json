@@ -1,0 +1,18 @@
+[
+ {
+  "default_value": null,
+  "doc_type": "Timesheet",
+  "docstatus": 0,
+  "doctype": "Property Setter",
+  "doctype_or_field": "DocField",
+  "field_name": "status",
+  "is_system_generated": 1,
+  "modified": "2026-10-05 13:30:50.505813",
+  "module": null,
+  "name": "Timesheet-status-options",
+  "property": "options",
+  "property_type": "Text",
+  "row_name": null,
+  "value": "Draft\nPending For Approval\nSubmitted\nPartially Billed\nBilled\nPayslip\nCompleted\nCancelled"
+ }
+]
