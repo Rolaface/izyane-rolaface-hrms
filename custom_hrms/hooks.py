@@ -257,7 +257,15 @@ fixtures = [
             ["dt", "=", "Employee"],
             ["is_system_generated", "=", 0]
         ]
-    }
+    },
+    {
+        "dt": "Property Setter",
+        "filters": [
+            ["doc_type", "=", "Timesheet"],
+            ["field_name", "=", "status"],
+        ],
+    },
+
 ]
 
 doc_events = {
@@ -274,5 +282,9 @@ doc_events = {
     },
     "Holiday List": {
         "on_update": "custom_hrms.notifications.notify_holiday_update"
+    },
+    "Timesheet": {
+        "before_validate": "custom_hrms.overrides.hooks.timesheet.timesheet_status.remember_status",
+        "validate": "custom_hrms.overrides.hooks.timesheet.timesheet_status.restore_status",
     }
 }
