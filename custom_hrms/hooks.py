@@ -254,7 +254,7 @@ fixtures = [
     {
         "doctype": "Custom Field",
         "filters": [
-            ["dt", "=", "Employee"],
+            ["dt", "in", [ "Employee", "Timesheet" ]],
             ["is_system_generated", "=", 0]
         ]
     },
