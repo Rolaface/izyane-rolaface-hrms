@@ -282,9 +282,5 @@ doc_events = {
     },
     "Holiday List": {
         "on_update": "custom_hrms.notifications.notify_holiday_update"
-    },
-    "Timesheet": {
-        "before_validate": "custom_hrms.overrides.hooks.timesheet.timesheet_status.remember_status",
-        "validate": "custom_hrms.overrides.hooks.timesheet.timesheet_status.restore_status",
     }
 }
