@@ -286,5 +286,8 @@ doc_events = {
     "Timesheet": {
         "before_validate": "custom_hrms.overrides.hooks.timesheet.timesheet_status.remember_status",
         "validate": "custom_hrms.overrides.hooks.timesheet.timesheet_status.restore_status",
+    },
+    "Task":{
+        "validate": "custom_hrms.overrides.hooks.tasks.validate.validate_task",
     }
 }
