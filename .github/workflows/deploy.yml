@@ -23,42 +23,38 @@ jobs:
           timeout: 60s
           command_timeout: 600s
           script: |
+            set -e
             SITE="api.erp.udvell.rolaface.com"
             BENCH_DIR="/srv/apps/erp/backend/rolaface-izayne-bench"
 
-            echo "📂 Switching to bench directory..."
+            su - frappe -c "SITE='$SITE' BENCH_DIR='$BENCH_DIR' bash -s" <<'EOF'
+            export NVM_DIR="$HOME/.nvm"
+            [ -s "$NVM_DIR/nvm.sh" ] && . "$NVM_DIR/nvm.sh"
+            nvm use 24
+            set -eo pipefail
+
+            export PATH="$HOME/.local/bin:$PATH"
+            cd "$BENCH_DIR"
+            source env/bin/activate
+            which bench
+
+            echo "⬇️ Pull latest code..."
+            cd apps/custom_hrms
+            git pull upstream version-16
             cd "$BENCH_DIR"
 
-            su - frappe -c "
-              cd \"$BENCH_DIR\"
-              export NVM_DIR=~/.nvm
-              [ -s \"\$NVM_DIR/nvm.sh\" ] && . \"\$NVM_DIR/nvm.sh\"
-              nvm use 24
-              export PATH=\"/home/frappe/.local/bin:\$PATH\"
-              source env/bin/activate
-              which bench || { echo '❌ bench not found on PATH'; exit 1; }
-              echo '📦 Backup...'
-              ...
-              "
-              bench --site \"$SITE\" backup || { echo '❌ Backup failed'; exit 1; }
+            echo "⚙️ Run migrations..."
+            bench --site "$SITE" migrate
+            echo "✅ Migration done"
 
-              echo '⬇️ Pull latest code...'
-              cd apps/custom_hrms
-              git pull upstream version-16 || { echo '❌ Git pull failed'; exit 1; }
-              cd \"$BENCH_DIR\"
+            echo "🎨 Build assets..."
+            bench build --verbose 2>&1 | { grep -v 'Browserslist: caniuse-lite is outdated' || true; }
 
-              echo '⚙️ Run migrations...'
-              bench --site \"$SITE\" migrate 2>&1 || true
-              echo '✅ Migration done'
-
-              echo '🎨 Build assets...'
-              bench build --verbose 2>&1 | grep -v 'Browserslist: caniuse-lite is outdated' || true
-
-              echo '🧹 Clear cache...'
-              bench --site \"$SITE\" clear-cache || { echo '❌ Clear cache failed'; exit 1; }
-            " || { echo '❌ Deploy script failed'; exit 1; }
+            echo "🧹 Clear cache..."
+            bench --site "$SITE" clear-cache
+            EOF
 
             echo "🔄 Restarting services..."
-            supervisorctl restart rolaface-izayne-bench-web: rolaface-izayne-bench-workers: || { echo '❌ Service restart failed'; exit 1; }
+            supervisorctl restart rolaface-izayne-bench-web: rolaface-izayne-bench-workers:
 
             echo "✅ Deploy complete!"
