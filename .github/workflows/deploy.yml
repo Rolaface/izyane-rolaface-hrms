@@ -31,14 +31,15 @@ jobs:
 
             su - frappe -c "
               cd \"$BENCH_DIR\"
-
               export NVM_DIR=~/.nvm
               [ -s \"\$NVM_DIR/nvm.sh\" ] && . \"\$NVM_DIR/nvm.sh\"
               nvm use 24
-
+              export PATH=\"/home/frappe/.local/bin:\$PATH\"
               source env/bin/activate
-
+              which bench || { echo '❌ bench not found on PATH'; exit 1; }
               echo '📦 Backup...'
+              ...
+              "
               bench --site \"$SITE\" backup || { echo '❌ Backup failed'; exit 1; }
 
               echo '⬇️ Pull latest code...'
