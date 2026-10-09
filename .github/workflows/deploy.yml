@@ -11,7 +11,7 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       - name: Deploy via SSH
         uses: appleboy/ssh-action@v1.0.0
@@ -36,7 +36,6 @@ jobs:
             export PATH="$HOME/.local/bin:$PATH"
             cd "$BENCH_DIR"
             source env/bin/activate
-            which bench
 
             echo "⬇️ Pull latest code..."
             cd apps/custom_hrms
@@ -45,7 +44,6 @@ jobs:
 
             echo "⚙️ Run migrations..."
             bench --site "$SITE" migrate
-            echo "✅ Migration done"
 
             echo "🎨 Build assets..."
             bench build --verbose 2>&1 | { grep -v 'Browserslist: caniuse-lite is outdated' || true; }
@@ -55,6 +53,8 @@ jobs:
             EOF
 
             echo "🔄 Restarting services..."
-            supervisorctl restart rolaface-izayne-bench-web: rolaface-izayne-bench-workers:
+            supervisorctl restart rolaface-izayne-bench-web:rolaface-izayne-bench-frappe-web || true
+            supervisorctl restart rolaface-izayne-bench-workers:rolaface-izayne-bench-frappe-short-worker-0 rolaface-izayne-bench-workers:rolaface-izayne-bench-frappe-long-worker-0 || true
+            supervisorctl status | grep rolaface-izayne-bench || true
 
             echo "✅ Deploy complete!"
