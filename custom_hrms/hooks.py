@@ -254,15 +254,40 @@ fixtures = [
     {
         "doctype": "Custom Field",
         "filters": [
-            ["dt", "=", "Employee"],
+            ["dt", "in", [ "Employee", "Timesheet", "Task" ]],
             ["is_system_generated", "=", 0]
         ]
-    }
+    },
+    {
+        "dt": "Property Setter",
+        "filters": [
+            ["doc_type", "=", "Timesheet"],
+            ["field_name", "=", "status"],
+        ],
+    },
+
 ]
 
 doc_events = {
     "Expense Claim": {
         "validate": "custom_hrms.api.expense.before_validate_hooks.before_validate",
         "after_insert": "custom_hrms.api.expense.after_insert_hooks.after_insert.trigger_email_notification",
+        "on_update": "custom_hrms.notifications.notify_expense_status",
+    },
+    "Leave Application": {
+        "on_update": "custom_hrms.notifications.notify_leave_status"
+    },
+    "Salary Slip": {
+        "on_submit": "custom_hrms.notifications.notify_payslip_generated"
+    },
+    "Holiday List": {
+        "on_update": "custom_hrms.notifications.notify_holiday_update"
+    },
+    "Timesheet": {
+        "before_validate": "custom_hrms.overrides.hooks.timesheet.timesheet_status.remember_status",
+        "validate": "custom_hrms.overrides.hooks.timesheet.timesheet_status.restore_status",
+    },
+    "Task":{
+        "validate": "custom_hrms.overrides.hooks.tasks.validate.validate_task",
     }
 }
