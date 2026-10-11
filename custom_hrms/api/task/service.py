@@ -73,8 +73,8 @@ def _validate_project(project):
         return
     if not frappe.db.exists("Project", project):
         frappe.throw(_("Project {0} does not exist").format(project), frappe.DoesNotExistError)
-    if not frappe.has_permission("Project", "read", doc=project):
-        frappe.throw(_("Not permitted to read this project"), frappe.PermissionError)
+    # if not frappe.has_permission("Project", "read", doc=project):
+    #     frappe.throw(_("Not permitted to read this project"), frappe.PermissionError)
 
 
 def _resolve_assignment_statuses(assignment_status):
