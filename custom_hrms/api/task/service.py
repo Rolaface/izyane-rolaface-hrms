@@ -3,7 +3,6 @@ from frappe import _
 from frappe.utils import cint
 
 from custom_hrms.api.task.constants import (
-    ALL_TASKS_ROLES,
     ASSIGNMENT_STATUSES,
     BASE_TASK_FIELDS,
     BATCH_SIZE,
@@ -12,11 +11,6 @@ from custom_hrms.api.task.constants import (
     MAX_PAGE_SIZE,
     PRIVILEGED_ROLES,
 )
-
-
-# ---------------------------------------------------------------------------
-# Generic helpers
-# ---------------------------------------------------------------------------
 
 
 def _as_list(value):
@@ -46,19 +40,8 @@ def _chunks(items, size=BATCH_SIZE):
         yield values[start : start + size]
 
 
-# ---------------------------------------------------------------------------
-# Access and validation
-# ---------------------------------------------------------------------------
-
-
-def _is_all_tasks_mode(employee):
-    """Admin-like users see every Task unless they ask for one employee."""
-    if employee:
-        return False
-    session_user = frappe.session.user
-    if session_user == "Administrator":
-        return True
-    return bool(set(frappe.get_roles(session_user)) & ALL_TASKS_ROLES)
+def _is_all_tasks_mode(employee, mine):
+    return not employee and not mine
 
 
 def _resolve_target_user(employee):
@@ -103,11 +86,6 @@ def _resolve_assignment_statuses(assignment_status):
     if invalid:
         frappe.throw(_("Invalid assignment status: {0}").format(", ".join(invalid)))
     return requested
-
-
-# ---------------------------------------------------------------------------
-# Database fetching
-# ---------------------------------------------------------------------------
 
 
 def _task_fields():
@@ -160,7 +138,6 @@ def _fetch_assignments(target_user, statuses):
 
 
 def _fetch_assignments_for_tasks(task_names, statuses):
-    """Fetch matching ToDo assignments for tasks without restricting by assignee."""
     assignments = []
 
     for batch_names in _chunks(task_names):
@@ -209,7 +186,6 @@ def _fetch_tasks(names, fields, extra_filters=None):
 
 
 def _fetch_all_tasks(fields, filters):
-    """Fetch every Task visible to the current session user, in bounded batches."""
     rows = []
     start = 0
 
@@ -240,28 +216,18 @@ def _group_by_task(assignments):
 
 
 def _load_scope(is_all_tasks_mode, target_user, todo_statuses, fields, filters):
-    """Return (task_rows, assignments_by_task) for the current viewer."""
     if is_all_tasks_mode:
-        # Admin/System Manager/Professional get all Task documents visible to
-        # them, including tasks with no ToDo assignment.
         task_rows = _fetch_all_tasks(fields, filters)
         assignments = _fetch_assignments_for_tasks(
             [row["name"] for row in task_rows], todo_statuses
         )
         return task_rows, _group_by_task(assignments)
 
-    # Employees (and privileged users explicitly filtering by employee) get
-    # only tasks assigned to the resolved target user.
     assignments_by_task = _group_by_task(_fetch_assignments(target_user, todo_statuses))
     if not assignments_by_task:
         return [], {}
 
     return _fetch_tasks(assignments_by_task.keys(), fields, filters), assignments_by_task
-
-
-# ---------------------------------------------------------------------------
-# Hierarchy: ancestors, chains, ordering, search
-# ---------------------------------------------------------------------------
 
 
 def _load_ancestors(tasks, fields):
@@ -359,11 +325,6 @@ def _filter_matches(tasks, chains, search):
 
 
 def _order_matches(matched, chains):
-    """Depth-first order over matches plus their ancestors.
-
-    Returns (positions, ordered_matches): `positions` covers ancestors too so
-    context rows can be sorted the same way.
-    """
     display_nodes = dict(matched)
     for name in matched:
         for ancestor in chains[name][0]:
@@ -371,13 +332,21 @@ def _order_matches(matched, chains):
 
     ordered_names = _depth_first_order(display_nodes, _priority_rank())
     positions = {name: index for index, name in enumerate(ordered_names)}
-    ordered_matches = [name for name in ordered_names if name in matched]
-    return positions, ordered_matches
 
+    blocks = []
+    for name in ordered_names:
+        if display_nodes[name].get("parent_task") in display_nodes and blocks:
+            blocks[-1].append(name)
+        else:
+            blocks.append([name])
 
-# ---------------------------------------------------------------------------
-# Response shaping
-# ---------------------------------------------------------------------------
+    root_blocks = [
+        [name for name in block if name in matched]
+        for block in blocks
+    ]
+    root_blocks = [block for block in root_blocks if block]
+
+    return positions, root_blocks
 
 
 def _public_row(task, chain, has_hidden_ancestor, assignments, context_only):
@@ -419,6 +388,8 @@ def _empty_response(page, page_size, target_user, assignment_statuses):
             "page": page,
             "page_size": page_size,
             "total": 0,
+            "total_pages": 1,
+            "total_tasks": 0,
             "has_more": False,
         },
         "meta": {
@@ -429,7 +400,6 @@ def _empty_response(page, page_size, target_user, assignment_statuses):
 
 
 def _build_page(page_names, matched, chains, universe, positions, assignments_by_task):
-    """Rows for the requested page plus context rows for ancestors outside it."""
     page_name_set = set(page_names)
 
     data = [
@@ -467,11 +437,6 @@ def _build_page(page_names, matched, chains, universe, positions, assignments_by
     return data, context
 
 
-# ---------------------------------------------------------------------------
-# Public entry points (called from api.py)
-# ---------------------------------------------------------------------------
-
-
 @frappe.whitelist()
 def get_project_assignees_data(project):
     if not project:
@@ -503,8 +468,10 @@ def get_assigned_tasks_data(
     assignment_status="Open",
     page=1,
     page_size=DEFAULT_PAGE_SIZE,
+    mine=0,
 ):
-    is_all_tasks_mode = _is_all_tasks_mode(employee)
+    mine = bool(cint(mine))
+    is_all_tasks_mode = _is_all_tasks_mode(employee, mine)
     target_user = _resolve_target_user(employee)
     page = max(cint(page), 1)
     page_size = min(max(cint(page_size) or DEFAULT_PAGE_SIZE, 1), MAX_PAGE_SIZE)
@@ -537,11 +504,16 @@ def get_assigned_tasks_data(
     if not matched:
         return empty()
 
-    positions, ordered_matches = _order_matches(matched, chains)
+    positions, root_blocks = _order_matches(matched, chains)
 
-    total = len(ordered_matches)
+    total = len(root_blocks)
+    total_pages = max((total + page_size - 1) // page_size, 1)
     start = (page - 1) * page_size
-    page_names = ordered_matches[start : start + page_size]
+    page_names = [
+        name
+        for block in root_blocks[start : start + page_size]
+        for name in block
+    ]
 
     data, context = _build_page(
         page_names, matched, chains, universe, positions, assignments_by_task
@@ -554,6 +526,8 @@ def get_assigned_tasks_data(
             "page": page,
             "page_size": page_size,
             "total": total,
+            "total_pages": total_pages,
+            "total_tasks": len(matched),
             "has_more": start + page_size < total,
         },
         "meta": {
