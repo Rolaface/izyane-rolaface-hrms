@@ -27,6 +27,7 @@ def get_assigned_tasks(
     assignment_status="Open",
     page=1,
     page_size=DEFAULT_PAGE_SIZE,
+    mine=0,
 ):
     return get_assigned_tasks_data(
         employee=employee,
@@ -39,4 +40,5 @@ def get_assigned_tasks(
         assignment_status=assignment_status,
         page=page,
         page_size=page_size,
+        mine=mine,
     )
