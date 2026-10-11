@@ -359,6 +359,13 @@ def _public_row(task, chain, has_hidden_ancestor, assignments, context_only):
         "status": task.get("status"),
         "priority": task.get("priority"),
         "custom_activity_type": task.get("custom_activity_type"),
+        "modified": task.get("modified"),
+        "owner": task.get("owner"),
+        "creation": task.get("creation"),
+        "exp_start_date": task.get("exp_start_date"),
+        "exp_end_date": task.get("exp_end_date"),
+        "progress": task.get("progress"),
+        "is_milestone": cint(task.get("is_milestone")),
         "depth": len(chain),
         "ancestors": [
             {"name": ancestor["name"], "subject": ancestor.get("subject")}
