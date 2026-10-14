@@ -1,6 +1,8 @@
 import frappe
 from frappe.utils import flt, getdate
 
+GROUP_BY_OPTIONS = ("employee", "project", "date", "month")
+
 
 def get_employee_group_field():
     meta = frappe.get_meta("Employee")
@@ -9,6 +11,44 @@ def get_employee_group_field():
         return "employee_group"
 
     return None
+
+
+def parse_group_by(value):
+    """
+    Accepts None, "project", "project,employee", '["project","employee"]'
+    or a list. Returns an ordered list of unique, valid group levels.
+    """
+    if not value:
+        return []
+
+    if isinstance(value, str):
+        value = value.strip()
+
+        if value.startswith("["):
+            value = frappe.parse_json(value)
+        else:
+            value = [part.strip() for part in value.split(",")]
+
+    if not isinstance(value, (list, tuple)):
+        frappe.throw("Group By must be provided as a list.")
+
+    levels = [level for level in value if level]
+
+    invalid = [level for level in levels if level not in GROUP_BY_OPTIONS]
+
+    if invalid:
+        frappe.throw(
+            "Invalid Group By: "
+            + ", ".join(invalid)
+            + ". Allowed: "
+            + ", ".join(GROUP_BY_OPTIONS)
+            + "."
+        )
+
+    if len(set(levels)) != len(levels):
+        frappe.throw("Group By levels must be unique.")
+
+    return levels
 
 
 def get_report_data(filters):
@@ -44,7 +84,7 @@ def get_report_data(filters):
     if filters.get("status"):
         timesheet_filters["status"] = filters["status"]
 
-    timesheets = frappe.get_list(
+    timesheets = frappe.get_all(
         "Timesheet",
         filters=timesheet_filters,
         fields=[
@@ -67,7 +107,7 @@ def get_report_data(filters):
                 "DocType does not have an employee_group field."
             )
 
-        matching_employees = frappe.get_list(
+        matching_employees = frappe.get_all(
             "Employee",
             filters={group_field: employee_group},
             fields=["name"],
@@ -81,7 +121,22 @@ def get_report_data(filters):
             if row.employee in matching_employee_ids
         ]
 
-    # ---- Project filter (single + multiple) ----
+    timesheet_employee_ids = list({row.employee for row in timesheets})
+
+    designation_map = {}
+
+    if timesheet_employee_ids:
+        designation_rows = frappe.get_all(
+            "Employee",
+            filters={"name": ["in", timesheet_employee_ids]},
+            fields=["name", "designation"],
+        )
+
+        designation_map = {
+            row.name: row.designation
+            for row in designation_rows
+        }
+
     project_ids_filter = filters.get("projects")
 
     if isinstance(project_ids_filter, str):
@@ -105,7 +160,7 @@ def get_report_data(filters):
     if filters.get("customer"):
         project_filters["customer"] = filters["customer"]
 
-    projects = frappe.get_list(
+    projects = frappe.get_all(
         "Project",
         filters=project_filters,
         fields=[
@@ -128,7 +183,7 @@ def get_report_data(filters):
         if project.customer
     }
 
-    customers = frappe.get_list(
+    customers = frappe.get_all(
         "Customer",
         filters={"name": ["in", list(customer_ids)]}
         if customer_ids
@@ -144,11 +199,7 @@ def get_report_data(filters):
     rows = []
 
     for timesheet_row in timesheets:
-        doc = frappe.get_doc(
-            "Timesheet",
-            timesheet_row.name,
-            check_permission=True,
-        )
+        doc = frappe.get_doc("Timesheet", timesheet_row.name)
 
         for detail in doc.get("time_logs", []):
             if not detail.from_time:
@@ -197,12 +248,15 @@ def get_report_data(filters):
                 "timesheet_title": doc.get("title"),
                 "employee": doc.employee,
                 "employee_name": doc.employee_name,
+                "designation": designation_map.get(doc.employee) or None,
                 "status": doc.status,
                 "detail_id": detail.name,
                 "from_time": detail.from_time,
                 "to_time": detail.to_time,
                 "date": entry_date.isoformat(),
                 "day_name": entry_date.strftime("%A"),
+                "month": entry_date.strftime("%Y-%m"),
+                "month_name": entry_date.strftime("%B %Y"),
                 "hours": hours,
                 "project": project_id,
                 "project_name": project.project_name if project else None,
@@ -220,6 +274,21 @@ def get_report_data(filters):
                 "costing_amount": flt(detail.costing_amount),
                 "completed": bool(detail.completed),
             })
+
+    employee_dates = {}
+    employee_project_dates = {}
+
+    for row in rows:
+        employee_dates.setdefault(row["employee"], set()).add(row["date"])
+        employee_project_dates.setdefault(
+            (row["employee"], row["project"]), set()
+        ).add(row["date"])
+
+    for row in rows:
+        row["work_days"] = len(employee_dates[row["employee"]])
+        row["project_work_days"] = len(
+            employee_project_dates[(row["employee"], row["project"])]
+        )
 
     rows.sort(
         key=lambda row: (
@@ -245,6 +314,18 @@ def build_summary(rows):
         if row.get("project")
     }
 
+    work_dates = {
+        row.get("date")
+        for row in rows
+        if row.get("date")
+    }
+
+    month_keys = {
+        row.get("month")
+        for row in rows
+        if row.get("month")
+    }
+
     total_hours = sum(flt(row.get("hours")) for row in rows)
 
     billable_hours = sum(
@@ -267,6 +348,8 @@ def build_summary(rows):
         "total_entries": len(rows),
         "total_employees": len(employee_ids),
         "total_projects": len(project_ids),
+        "total_work_days": len(work_dates),
+        "total_months": len(month_keys),
         "total_hours": total_hours,
         "billable_hours": billable_hours,
         "non_billable_hours": non_billable_hours,
@@ -275,48 +358,107 @@ def build_summary(rows):
     }
 
 
-def group_report_data(rows, group_by):
-    if group_by not in ("employee", "project", "date"):
-        group_by = "employee"
+def _group_identity(row, field):
+    if field == "employee":
+        group_id = row.get("employee") or "Unassigned"
+        return group_id, row.get("employee_name") or group_id
 
-    grouped = {}
+    if field == "project":
+        group_id = row.get("project") or "Unassigned"
+        return group_id, row.get("project_name") or group_id
+
+    if field == "month":
+        group_id = row.get("month") or "Unassigned"
+        return group_id, row.get("month_name") or group_id
+
+    group_id = row.get("date") or "Unassigned"
+    return group_id, group_id
+
+
+def _aggregate(rows):
+    total_hours = 0
+    billable_hours = 0
+    billable_amount = 0
+    costing_amount = 0
+    work_dates = set()
 
     for row in rows:
-        if group_by == "employee":
-            group_id = row.get("employee") or "Unassigned"
-            group_name = row.get("employee_name") or group_id
+        hours = flt(row.get("hours"))
 
-        elif group_by == "project":
-            group_id = row.get("project") or "Unassigned"
-            group_name = row.get("project_name") or group_id
-
-        else:
-            group_id = row.get("date") or "Unassigned"
-            group_name = group_id
-
-            if row.get("day_name"):
-                group_name = f"{group_id} ({row['day_name']})"
-
-        if group_id not in grouped:
-            grouped[group_id] = {
-                "group": group_name,
-                "group_id": group_id,
-                "entries": [],
-                "total_hours": 0,
-                "billable_hours": 0,
-                "non_billable_hours": 0,
-                "total_billable_amount": 0,
-            }
-
-        group = grouped[group_id]
-
-        group["entries"].append(row)
-        group["total_hours"] += flt(row.get("hours"))
+        total_hours += hours
+        costing_amount += flt(row.get("costing_amount"))
 
         if row.get("is_billable"):
-            group["billable_hours"] += flt(row.get("hours"))
-            group["total_billable_amount"] += flt(row.get("billing_amount"))
-        else:
-            group["non_billable_hours"] += flt(row.get("hours"))
+            billable_hours += hours
+            billable_amount += flt(row.get("billing_amount"))
 
-    return list(grouped.values())
+        if row.get("date"):
+            work_dates.add(row["date"])
+
+    return {
+        "total_hours": total_hours,
+        "billable_hours": billable_hours,
+        "non_billable_hours": total_hours - billable_hours,
+        "total_billable_amount": billable_amount,
+        "total_costing_amount": costing_amount,
+        "work_days": len(work_dates),
+        "entry_count": len(rows),
+    }
+
+
+def _build_groups(rows, levels):
+    field, remaining = levels[0], levels[1:]
+
+    buckets = {}
+
+    for row in rows:
+        group_id, group_name = _group_identity(row, field)
+
+        bucket = buckets.setdefault(
+            group_id,
+            {
+                "name": group_name,
+                "day_name": row.get("day_name") if field == "date" else None,
+                "rows": [],
+            },
+        )
+
+        bucket["rows"].append(row)
+
+    result = []
+
+    for group_id in sorted(buckets):
+        bucket = buckets[group_id]
+
+        node = {
+            "group": bucket["name"],
+            "group_id": group_id,
+            "level": field,
+            **_aggregate(bucket["rows"]),
+        }
+
+        if field == "date":
+            node["day_name"] = bucket["day_name"]
+
+        if remaining:
+            node["children"] = _build_groups(bucket["rows"], remaining)
+        else:
+            node["entries"] = bucket["rows"]
+
+        result.append(node)
+
+    return result
+
+
+def group_report_data(rows, group_by):
+    """
+    group_by: ordered list of levels, e.g. ["project", "employee"].
+    Returns a nested tree. Every node carries its own totals; only the
+    last level carries `entries`, the levels above carry `children`.
+    """
+    levels = parse_group_by(group_by)
+
+    if not levels:
+        return []
+
+    return _build_groups(rows, levels)
