@@ -1,0 +1,41 @@
+{
+  "doctype": "DocType",
+  "name": "Project User Details",
+  "module": "custom hrms",
+  "custom": 0,
+  "istable": 1,
+  "editable_grid": 1,
+  "field_order": [
+    "user",
+    "project_role",
+    "activity_type"
+  ],
+  "fields": [
+    {
+      "fieldname": "user",
+      "fieldtype": "Link",
+      "label": "User",
+      "options": "User",
+      "reqd": 1,
+      "in_list_view": 1
+    },
+    {
+      "fieldname": "project_role",
+      "fieldtype": "Link",
+      "label": "Project Role",
+      "options": "Project Role",
+      "reqd": 1,
+      "in_list_view": 1
+    },
+    {
+      "fieldname": "activity_type",
+      "fieldtype": "Link",
+      "label": "Activity Type",
+      "options": "Activity Type",
+      "in_list_view": 1
+    }
+  ],
+  "permissions": [],
+  "sort_field": "modified",
+  "sort_order": "DESC"
+}

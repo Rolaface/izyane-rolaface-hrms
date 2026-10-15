@@ -254,7 +254,7 @@ fixtures = [
     {
         "doctype": "Custom Field",
         "filters": [
-            ["dt", "in", [ "Employee", "Timesheet", "Task" ]],
+            ["dt", "in", [ "Employee", "Timesheet", "Task" ,"Project"]],
             ["is_system_generated", "=", 0]
         ]
     },
@@ -290,4 +290,12 @@ doc_events = {
     # "Task":{
     #     "validate": "custom_hrms.overrides.hooks.tasks.validate.validate_task",
     # }
+    "Project": {
+    "before_save": "custom_hrms.setup.project_team.sync_project_team_to_project_users",
+},
+
+    
 }
+after_migrate = [
+    "custom_hrms.setup.project_team.create_project_team_field"
+]
