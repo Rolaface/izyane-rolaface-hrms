@@ -134,9 +134,9 @@ def get_expense_claims(
 
     if approval_status:
         if approval_status not in ["Paid", "Unpaid"]:
-            filters["approval_status"] = approval_status
+            filters["approval_status"] =  ["in", approval_status]
         else:
-            filters["status"] = approval_status
+            filters["status"] =  ["in", approval_status]
 
     if search:
         expense_type_claims = frappe.get_all(
